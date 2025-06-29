@@ -39,10 +39,21 @@ pdop = (body[0] & 0x3F) * (1.0/3.0) + 1.0
 # tag id
 tag_id = ((body[0] & 0xFC) >> 6) | (body[1] << 2)
 
+UNKNOWN_COORD = 9999999.0
+
 lat_int = struct.unpack('<i', body[2:6])[0]
 lon_int = struct.unpack('<i', body[6:10])[0]
+
+# bit 30 of latitude encodes whether the GPS fix is "fresh"
+is_fresh = ((lat_int >> 30) & 1) == 1
+
 latitude = lat_int / 1e7
 longitude = lon_int / 1e7
+
+if not is_fresh:
+    # The APK replaces invalid coordinates with 9999999.0
+    latitude = UNKNOWN_COORD
+    longitude = UNKNOWN_COORD
 
 altitude = struct.unpack('<H', body[10:12])[0] - 100
 
@@ -75,6 +86,7 @@ print("  Packet type:", hex(ptype))
 print("  Parser:", hex(parser))
 print("  PDOP:", pdop)
 print("  Tag ID:", tag_id)
+print("  Fresh:", is_fresh)
 print("  Lat:", latitude)
 print("  Lon:", longitude)
 print("  Altitude:", altitude)
