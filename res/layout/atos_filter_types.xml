@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:layout_gravity="center_horizontal" android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout style="@style/color_row_layout">
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_pax" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_pax_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_hound" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_hound_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_med" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_medical_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_equip" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_equipment_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout style="@style/color_row_layout">
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_uas" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_uas_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_fixed" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_fixed_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_rotary" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_rotary_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_bundle" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_bundle_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout style="@style/color_row_layout">
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_vehicle" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_veh_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_weapon" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_weapon_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_boat" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_boat_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_type_custom" style="@style/color_check_checkbox" />
+            <ImageView android:src="@drawable/ic_track_custom_large" style="@style/filter_type_check_image" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

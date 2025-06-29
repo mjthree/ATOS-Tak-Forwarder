@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@drawable/background_manifest_item" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_margin="2.0dip"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <LinearLayout android:layout_width="fill_parent" android:layout_height="wrap_content" android:weightSum="6.0">
+            <TextView android:layout_gravity="center" android:id="@id/tv_manifest_item_name" android:text="Manifest:" android:layout_weight="5.0" style="@style/text_entry_label" />
+            <ImageView android:paddingRight="8.0dip" android:layout_height="32.0dip" android:src="@drawable/selector_extras_caret" android:layout_weight="1.0" style="@style/caret_extras_drop_down" />
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:textSize="14.0dip" android:layout_gravity="left" android:id="@id/tv_manifest_item_tag_count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="14.0dip" android:text="69 tags" style="@style/text_entry_label" />
+    <LinearLayout android:gravity="center" android:id="@id/linear_manifest_item_extras" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <ImageButton android:id="@id/ibtn_manifest_item_details" android:src="@drawable/ic_details" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_manifest_item_rename" android:src="@drawable/ic_rename" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_manifest_item_copy" android:src="@drawable/ic_copy" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_manifest_item_send" android:padding="8.0dip" android:src="@drawable/ic_send" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_manifest_item_save" android:padding="8.0dip" android:src="@drawable/ic_save" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_manifest_item_delete" android:src="@drawable/ic_delete" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_manifest_item_reset" android:visibility="gone" android:src="@drawable/ic_refresh_icon" style="@style/btn_image_list_item" />
+    </LinearLayout>
+</LinearLayout>

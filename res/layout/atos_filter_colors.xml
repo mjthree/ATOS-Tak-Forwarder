@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:layout_gravity="center_horizontal" android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout style="@style/color_row_layout">
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_white" style="@style/color_check_checkbox" />
+            <View android:background="@color/white" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_yellow" style="@style/color_check_checkbox" />
+            <View android:background="@color/yellow" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_orange" style="@style/color_check_checkbox" />
+            <View android:background="@color/orange" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_magenta" style="@style/color_check_checkbox" />
+            <View android:background="@color/magenta" style="@style/color_check_color" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout style="@style/color_row_layout">
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_red" style="@style/color_check_checkbox" />
+            <View android:background="@color/red" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_maroon" style="@style/color_check_checkbox" />
+            <View android:background="@color/maroon" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_purple" style="@style/color_check_checkbox" />
+            <View android:background="@color/purple" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_blue" style="@style/color_check_checkbox" />
+            <View android:background="@color/check_blue" style="@style/color_check_color" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout style="@style/color_row_layout">
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_cyan" style="@style/color_check_checkbox" />
+            <View android:background="@color/cyan" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_teal" style="@style/color_check_checkbox" />
+            <View android:background="@color/teal" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_green" style="@style/color_check_checkbox" />
+            <View android:background="@color/green" style="@style/color_check_color" />
+        </LinearLayout>
+        <LinearLayout style="@style/color_check_layout">
+            <CheckBox android:id="@id/checkbox_filter_color_dark_green" style="@style/color_check_checkbox" />
+            <View android:background="@color/dark_green" style="@style/color_check_color" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

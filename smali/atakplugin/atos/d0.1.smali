@@ -1,0 +1,38 @@
+.class public final synthetic Latakplugin/atos/d0;
+.super Ljava/lang/Object;
+.source "SourceFile"
+
+# interfaces
+.implements Lorg/sqlite/jdbc3/JDBC3Statement$SQLCallable;
+
+
+# instance fields
+.field public final synthetic a:Lorg/sqlite/jdbc3/JDBC3PreparedStatement;
+
+
+# direct methods
+.method public synthetic constructor <init>(Lorg/sqlite/jdbc3/JDBC3PreparedStatement;)V
+    .locals 0
+
+    .line 1
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    iput-object p1, p0, Latakplugin/atos/d0;->a:Lorg/sqlite/jdbc3/JDBC3PreparedStatement;
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public final call()Ljava/lang/Object;
+    .locals 1
+
+    .line 1
+    iget-object v0, p0, Latakplugin/atos/d0;->a:Lorg/sqlite/jdbc3/JDBC3PreparedStatement;
+
+    invoke-static {v0}, Lorg/sqlite/jdbc3/JDBC3PreparedStatement;->h(Lorg/sqlite/jdbc3/JDBC3PreparedStatement;)Ljava/sql/ResultSet;
+
+    move-result-object v0
+
+    return-object v0
+.end method

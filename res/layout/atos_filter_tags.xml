@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ScrollView android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_margin="6.0dip">
+        <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent">
+            <include layout="@layout/atos_filter_colors" />
+            <include layout="@layout/atos_filter_types" />
+            <LinearLayout style="@style/text_entry_layout">
+                <TextView android:text="@string/tag_id_range_start" style="@style/text_entry_label" />
+                <EditText android:id="@id/edit_filter_tag_id_start" android:hint="1" android:inputType="numberSigned" style="@style/text_entry_value" />
+            </LinearLayout>
+            <LinearLayout style="@style/text_entry_layout">
+                <TextView android:text="@string/tag_id_range_end" style="@style/text_entry_label" />
+                <EditText android:id="@id/edit_filter_tag_id_end" android:hint="100" android:inputType="numberSigned" style="@style/text_entry_value" />
+            </LinearLayout>
+            <LinearLayout style="@style/text_entry_layout">
+                <TextView android:text="@string/call_sign" style="@style/text_entry_label" />
+                <EditText android:id="@id/edit_filter_callsign" android:hint="@string/call_sign_hint" style="@style/text_entry_value" />
+            </LinearLayout>
+            <LinearLayout style="@style/text_entry_layout">
+                <TextView android:text="@string/distance_label" style="@style/text_entry_label" />
+                <EditText android:id="@id/edit_filter_distance" android:hint="1000" android:inputType="number" style="@style/text_entry_value" />
+            </LinearLayout>
+            <LinearLayout android:weightSum="6.0" style="@style/text_entry_layout">
+                <TextView android:text="Show Results with Color AND Type?" android:layout_weight="5.0" style="@style/text_entry_label" />
+                <CheckBox android:layout_gravity="center_horizontal" android:id="@id/checkbox_attribute_logic_and" style="@style/color_check_checkbox" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

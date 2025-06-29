@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@drawable/btn_team" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="4.0dip" android:paddingStart="6.0dip" android:paddingEnd="6.0dip"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:layout_width="fill_parent" android:layout_height="wrap_content" android:weightSum="6.0">
+        <TextView android:textSize="16.0sp" android:textStyle="bold" android:id="@id/txt_atos_record_archive_item_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="[Archive Name]" android:layout_weight="5.0" />
+        <ImageView android:id="@id/iv_atos_record_archive_tag_item_expanded_caret" android:paddingRight="8.0dip" android:layout_height="32.0dip" android:src="@drawable/selector_extras_caret" android:layout_weight="1.0" style="@style/caret_extras_drop_down" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:paddingTop="4.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content" android:weightSum="2.0" android:paddingStart="24.0dip">
+        <LinearLayout style="@style/atos_track_history_column">
+            <LinearLayout style="@style/atos_track_history_layout_pair">
+                <TextView android:text="@string/tracks_label" style="@style/atos_track_history_archive_element_lbl" />
+                <TextView android:id="@id/txt_atos_record_archive_item_track_count" android:text="@string/track_value_default" style="@style/atos_track_history_archive_element_val" />
+            </LinearLayout>
+            <LinearLayout style="@style/atos_track_history_layout_pair">
+                <TextView android:text="@string/data_points_label" style="@style/atos_track_history_archive_element_lbl" />
+                <TextView android:id="@id/txt_atos_record_archive_item_point_count" android:text="@string/points_number_default" style="@style/atos_track_history_archive_element_val" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout style="@style/atos_track_history_column">
+            <LinearLayout style="@style/atos_track_history_layout_pair">
+                <TextView android:text="@string/start" style="@style/atos_track_history_archive_element_lbl" />
+                <TextView android:id="@id/txt_atos_record_archive_item_first_time" android:text="@string/date_time_default" style="@style/atos_track_history_archive_element_val" />
+            </LinearLayout>
+            <LinearLayout style="@style/atos_track_history_layout_pair">
+                <TextView android:text="@string/stop" style="@style/atos_track_history_archive_element_lbl" />
+                <TextView android:id="@id/txt_atos_record_archive_item_last_time" android:text="@string/date_time_default" style="@style/atos_track_history_archive_element_val" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:gravity="center" android:id="@id/linear_atos_record_archive_item_extras" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <ImageButton android:id="@id/ibtn_atos_record_archive_item_details" android:src="@drawable/ic_details" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_atos_record_archive_item_export" android:visibility="gone" android:src="@drawable/ic_export" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_atos_record_archive_item_csv" android:padding="8.0dip" android:src="@drawable/ic_csv" style="@style/btn_image_list_item" />
+        <ImageButton android:id="@id/ibtn_atos_record_archive_item_delete" android:src="@drawable/ic_delete" style="@style/btn_image_list_item" />
+    </LinearLayout>
+</LinearLayout>
