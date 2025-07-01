@@ -592,6 +592,14 @@ def api_templates():
     save_templates(templates)
     return jsonify(list(templates.keys()))
 
+@app.route('/api/reset_tags', methods=['POST'])
+def api_reset_tags():
+    global tag_data
+    for tag_id, tag in tag_data.items():
+        tag['color'] = 'white'
+        tag['callsign'] = str(tag_id)
+    return jsonify({'status': 'success'})
+
 # ==== Utility functions ====
 
 def analyze_voltage_thresholds():

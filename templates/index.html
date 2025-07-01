@@ -40,6 +40,7 @@
         <button onclick="loadTemplate()">Load</button>
         <button onclick="deleteTemplate()">Delete</button>
         <button onclick="renameTemplate()">Rename</button>
+        <button id="reset-tags-btn" style="background:#fff;color:#c00;border:1px solid #c00;margin-left:20px;">Reset All Tags</button>
     </div>
 </div>
 <script>
@@ -112,6 +113,13 @@ function saveTemplate(){const name=document.getElementById('template-name').valu
 function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
 function deleteTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})}).then(fetchConfigs);}
 function renameTemplate(){const name=document.getElementById('templates').value;const newName=document.getElementById('template-name').value;if(!name||!newName)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rename',name,new_name:newName})}).then(fetchConfigs);}
+document.getElementById('reset-tags-btn').onclick = function() {
+  if(confirm('WARNING: This will reset ALL tags to white and callsigns to their tag number. This cannot be undone. Are you sure?')) {
+    fetch('/api/reset_tags', {method:'POST'})
+      .then(r=>r.json())
+      .then(()=>{fetchTags();});
+  }
+};
 fetchConfigs();fetchTags();startAutoRefresh();
 </script>
 </body>
