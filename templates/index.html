@@ -43,7 +43,12 @@
     </div>
 </div>
 <script>
+let refreshTimer;
+let isEditing=false;
+function startAutoRefresh(){refreshTimer=setInterval(fetchTags,2000);}
+function stopAutoRefresh(){clearInterval(refreshTimer);}
 function updateTable(tags){
+  if(isEditing) return;
   const tbody=document.getElementById('tag-table-body');
   tbody.innerHTML='';
   for(const [id,tag] of Object.entries(tags)){
@@ -57,12 +62,20 @@ function updateTable(tags){
     f.appendChild(chk);tr.appendChild(f);
     const c=document.createElement('td');
     const inp=document.createElement('input');
-    inp.value=tag.callsign;inp.onchange=()=>{fetch(`/api/tag/${id}/callsign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callsign:inp.value})});};
-    c.appendChild(inp);tr.appendChild(c);
+    inp.value=tag.callsign;
+    inp.readOnly=true;
+    const editBtn=document.createElement('button');
+    editBtn.textContent='Edit';
+    const saveBtn=document.createElement('button');
+    saveBtn.textContent='Save';
+    saveBtn.style.display='none';
+    editBtn.onclick=()=>{isEditing=true;stopAutoRefresh();inp.readOnly=false;editBtn.style.display='none';saveBtn.style.display='inline';};
+    saveBtn.onclick=()=>{fetch(`/api/tag/${id}/callsign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callsign:inp.value})}).then(()=>{inp.readOnly=true;editBtn.style.display='inline';saveBtn.style.display='none';isEditing=false;startAutoRefresh();});};
+    c.appendChild(inp);c.appendChild(editBtn);c.appendChild(saveBtn);tr.appendChild(c);
     tbody.appendChild(tr);
   }
 }
-function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);} 
+function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);}
 function fetchConfigs(){
   fetch('/api/tak_server').then(r=>r.json()).then(d=>{document.getElementById('tak-ip').value=d.ip;document.getElementById('tak-port').value=d.port;});
   fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
@@ -74,7 +87,7 @@ function saveTemplate(){const name=document.getElementById('template-name').valu
 function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
 function deleteTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})}).then(fetchConfigs);}
 function renameTemplate(){const name=document.getElementById('templates').value;const newName=document.getElementById('template-name').value;if(!name||!newName)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rename',name,new_name:newName})}).then(fetchConfigs);}
-fetchConfigs();fetchTags();setInterval(fetchTags,2000);
+fetchConfigs();fetchTags();startAutoRefresh();
 </script>
 </body>
 </html>
