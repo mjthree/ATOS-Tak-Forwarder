@@ -479,21 +479,18 @@ class AtosTAKClient:
             should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
             if not should_forward:
                 continue
-            # Only send if data has changed since last send
-            last = self.last_sent_data.get(tag_id)
-            # Merge color from config into tag data
+            # Always send, regardless of data change
             tag_to_send = tag.copy()
             tag_to_send['color'] = cfg.get('color', 'white')
-            if last == tag_to_send:
-                continue
-            callsign = cfg.get('callsign') or f'Tag{tag_id}'
+            callsign = cfg.get('callsign')
+            if not callsign:
+                callsign = str(tag_id)
             cot_message = self.create_cot_message(str(tag_id), tag_to_send, callsign)
             if cot_message:
                 host = tak_server_config.get('ip', '127.0.0.1')
                 port = tak_server_config.get('port', 0)
                 print(f"[DEBUG] Sending to {host}:{port} for Tag {tag_id}:")
                 self.sock.sendto(cot_message, (host, port))
-                self.last_sent_data[tag_id] = tag_to_send.copy()
                 print(f"✅ Sent COT for Tag {tag_id}: {tag_to_send.get('latitude', 0):.6f}°, {tag_to_send.get('longitude', 0):.6f}°, {tag_to_send.get('battery_voltage', 0)}V")
 
 # ==== API endpoints for web controls ====
