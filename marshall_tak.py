@@ -594,7 +594,12 @@ def api_templates():
 
 @app.route('/api/reset_tags', methods=['POST'])
 def api_reset_tags():
-    global tag_data
+    global tag_data, forwarding_config
+    # Reset persistent config for all tags
+    for tag_id in list(forwarding_config['tags'].keys()):
+        forwarding_config['tags'][tag_id]['callsign'] = str(tag_id)
+        forwarding_config['tags'][tag_id]['color'] = 'white'
+    save_forwarding_config(forwarding_config)
     tag_data.clear()
     return jsonify({'status': 'success'})
 
