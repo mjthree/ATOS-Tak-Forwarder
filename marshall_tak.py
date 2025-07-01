@@ -282,7 +282,8 @@ def parse_fourty_packet(pkt):
             'emergency': emergency,
             'is_fresh': is_fresh,
             'bad_gps': bad_gps,
-            'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
+            'timestamp_epoch': time.time()
         }
     except Exception as e:
         print(f"Error parsing FOURTY packet: {e}")
@@ -297,14 +298,19 @@ def parse_fiftysix_packet(pkt):
         return {
             'type': 'FIFTYSIX',
             'battery_percent': battery_percent,
-            'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
+            'timestamp_epoch': time.time()
         }
     except Exception as e:
         print(f"Error parsing FIFTYSIX packet: {e}")
         return None
 
 def get_tag_staleness(tag, threshold_seconds=15):
+    """Return True if tag data is older than threshold_seconds."""
     try:
+        if 'timestamp_epoch' in tag:
+            age = time.time() - float(tag['timestamp_epoch'])
+            return age > threshold_seconds
         today = datetime.now().date()
         if 'timestamp' in tag:
             if '.' in tag['timestamp']:
@@ -314,8 +320,7 @@ def get_tag_staleness(tag, threshold_seconds=15):
             tag_time = datetime.combine(today, time_obj.time())
             age = (datetime.now() - tag_time).total_seconds()
             return age > threshold_seconds
-        else:
-            return True
+        return True
     except Exception:
         return True
 
@@ -521,8 +526,9 @@ def api_tags():
     result = {}
     for i in range(1, 101):
         tag_id = str(i)
-        if tag_id in tag_data:
-            t = tag_data[tag_id].copy()
+        tag_key = int(tag_id)
+        if tag_key in tag_data:
+            t = tag_data[tag_key].copy()
             t['stale'] = get_tag_staleness(t)
         else:
             t = {'stale': True, 'bad_gps': True}
