@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATOS Forwarder Display</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #222;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            gap: 1vw;
+            width: 96vw;
+            height: 96vh;
+            margin: 2vh auto;
+        }
+        .tracker-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1vw;
+            font-size: 2vw;
+            font-weight: bold;
+            transition: background 0.3s, color 0.3s;
+            box-shadow: 0 0 0.5vw #0008;
+            border: 0.2vw solid #444;
+            min-width: 0;
+            min-height: 0;
+        }
+        .tracker-number {
+            font-size: 2.5vw;
+            margin-bottom: 0.5vw;
+        }
+        .status-label {
+            font-size: 1.2vw;
+            margin: 0.2vw 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- 100 tracker dashboard grid. Each box shows only the tag number and is color-coded by status. -->
+    <div class="dashboard-container" id="dashboard">
+        <!-- Tracker boxes will be injected here -->
+    </div>
+    <script>
+        // Color logic for each tracker box:
+        // - Red: Tag is stale
+        // - Green: Not stale and battery_voltage >= 3.50
+        // - Yellow: Not stale and battery_voltage < 3.50 or missing
+
+        // Returns the color for a tag object
+        function getBoxColor(tag) {
+            if (tag.stale) return '#ff4136'; // Red if stale
+            const voltage = tag.battery_voltage;
+            if (voltage === undefined || voltage === null) return '#ffdc00'; // Yellow if missing voltage
+            if (voltage >= 3.50) return '#2ecc40'; // Green if voltage >= 3.50
+            return '#ffdc00'; // Yellow if voltage < 3.50
+        }
+
+        // Renders the 100 tracker boxes
+        function renderTrackers(trackers) {
+            const dashboard = document.getElementById('dashboard');
+            dashboard.innerHTML = '';
+            for (let i = 1; i <= 100; i++) {
+                const tag = trackers[i] || {};
+                const boxColor = getBoxColor(tag);
+                const box = document.createElement('div');
+                box.className = 'tracker-box';
+                box.style.background = boxColor;
+                box.style.color = '#fff';
+                box.innerHTML = `<div class="tracker-number">${i}</div>`;
+                dashboard.appendChild(box);
+            }
+        }
+
+        // Fetches tag data from /api/tags and updates the dashboard
+        async function fetchTrackers() {
+            try {
+                const res = await fetch('/api/tags');
+                const data = await res.json();
+                // data is an object with keys '1'...'100', not an array
+                const trackers = {};
+                for (let i = 1; i <= 100; i++) {
+                    const tag = data[i.toString()];
+                    if (tag) trackers[i] = tag;
+                }
+                renderTrackers(trackers);
+            } catch (e) {
+                // On error, show empty boxes
+                renderTrackers({});
+            }
+        }
+        // Initial fetch and periodic refresh every 2 seconds
+        fetchTrackers();
+        setInterval(fetchTrackers, 2000);
+    </script>
+</body>
+</html> 
