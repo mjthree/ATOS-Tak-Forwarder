@@ -36,6 +36,9 @@ stats = {
     'error': None
 }
 
+# Lock to guard access to tag_data, stats and JSON export
+data_lock = threading.Lock()
+
 UNKNOWN_COORD = 9999999.0
 JSON_EXPORT_PATH = 'latest_tag_data.json'
 
@@ -326,32 +329,37 @@ def get_tag_staleness(tag, threshold_seconds=15):
 
 
 def export_json_with_stale():
-    export_data = {
-        'tags': {},
-        'stats': stats,
-        'history': packet_history[-10:]
-    }
-    for tag_id, tag in tag_data.items():
-        tag_copy = tag.copy()
-        tag_copy['stale'] = get_tag_staleness(tag_copy)
-        export_data['tags'][tag_id] = tag_copy
-    with open(JSON_EXPORT_PATH, 'w') as f:
-        json.dump(export_data, f, indent=2)
+    """Write latest tag data to JSON atomically."""
+    with data_lock:
+        export_data = {
+            'tags': {},
+            'stats': stats,
+            'history': packet_history[-10:]
+        }
+        for tag_id, tag in tag_data.items():
+            tag_copy = tag.copy()
+            tag_copy['stale'] = get_tag_staleness(tag_copy)
+            export_data['tags'][tag_id] = tag_copy
+        tmp_path = JSON_EXPORT_PATH + '.tmp'
+        with open(tmp_path, 'w') as f:
+            json.dump(export_data, f, indent=2)
+        os.replace(tmp_path, JSON_EXPORT_PATH)
 
 export_json = export_json_with_stale
 
 @app.route('/api/data')
 def get_data():
-    tags_with_stale = {}
-    for tag_id, tag in tag_data.items():
-        tag_copy = tag.copy()
-        tag_copy['stale'] = get_tag_staleness(tag_copy)
-        tags_with_stale[tag_id] = tag_copy
-    return jsonify({
-        'tags': tags_with_stale,
-        'stats': stats,
-        'history': packet_history[-10:]
-    })
+    with data_lock:
+        tags_with_stale = {}
+        for tag_id, tag in tag_data.items():
+            tag_copy = tag.copy()
+            tag_copy['stale'] = get_tag_staleness(tag_copy)
+            tags_with_stale[tag_id] = tag_copy
+        return jsonify({
+            'tags': tags_with_stale,
+            'stats': stats,
+            'history': packet_history[-10:]
+        })
 
 @app.route('/')
 def index():
@@ -371,8 +379,9 @@ def serial_reader():
             ser.setRTS(True)
             ser.flushInput()
             ser.flushOutput()
-            stats['connected'] = True
-            stats['error'] = None
+            with data_lock:
+                stats['connected'] = True
+                stats['error'] = None
             print("✅ Connected to COM4")
             buffer = b''
             while True:
@@ -382,30 +391,33 @@ def serial_reader():
                         buffer += data
                         packets, buffer = extract_packets_from_buffer(buffer)
                         for packet in packets:
-                            stats['total_packets'] += 1
-                            stats['last_update'] = datetime.now().strftime('%H:%M:%S')
+                            with data_lock:
+                                stats['total_packets'] += 1
+                                stats['last_update'] = datetime.now().strftime('%H:%M:%S')
                             if len(packet) >= 20:
                                 result = parse_fourty_packet(packet)
                                 if result:
                                     tag_id = result['tag_id']
-                                    old_data = tag_data.get(tag_id)
-                                    tag_data[tag_id] = result
-                                    log_tag_update(result)
-                                    log_voltage_tracking(tag_id, result['battery_voltage'], datetime.now().isoformat())
-                                    log_tag_status_change(tag_id, old_data, result)
+                                    with data_lock:
+                                        old_data = tag_data.get(tag_id)
+                                        tag_data[tag_id] = result
+                                        log_tag_update(result)
+                                        log_voltage_tracking(tag_id, result['battery_voltage'], datetime.now().isoformat())
+                                        log_tag_status_change(tag_id, old_data, result)
+                                        packet_history.append(result)
+                                        if len(packet_history) > 50:
+                                            packet_history.pop(0)
+                                        export_json()
                                     gps_status = "❌" if result['bad_gps'] else "✅"
                                     print(f"📡 Tag {tag_id}: {gps_status} {result['latitude']:.6f}°, {result['longitude']:.6f}°, {result['altitude_ft']:.1f}ft, {result['battery_voltage']}V")
-                                    packet_history.append(result)
-                                    if len(packet_history) > 50:
-                                        packet_history.pop(0)
-                                    export_json()
                             elif len(packet) >= 3:
                                 result = parse_fiftysix_packet(packet)
                                 if result:
-                                    packet_history.append(result)
-                                    if len(packet_history) > 50:
-                                        packet_history.pop(0)
-                                    export_json()
+                                    with data_lock:
+                                        packet_history.append(result)
+                                        if len(packet_history) > 50:
+                                            packet_history.pop(0)
+                                        export_json()
                     time.sleep(0.01)
                 except serial.SerialException as e:
                     print(f"Serial communication error: {e}")
@@ -416,19 +428,22 @@ def serial_reader():
         except serial.SerialException as e:
             error_msg = f"Serial connection error: {e}"
             print(f"❌ {error_msg}")
-            stats['connected'] = False
-            stats['error'] = error_msg
+            with data_lock:
+                stats['connected'] = False
+                stats['error'] = error_msg
         except PermissionError as e:
             error_msg = f"Permission error accessing COM4: {e}"
             print(f"❌ {error_msg}")
             print("💡 This usually means the port is in use or the device disconnected")
-            stats['connected'] = False
-            stats['error'] = error_msg
+            with data_lock:
+                stats['connected'] = False
+                stats['error'] = error_msg
         except Exception as e:
             error_msg = f"Unexpected error: {e}"
             print(f"❌ {error_msg}")
-            stats['connected'] = False
-            stats['error'] = error_msg
+            with data_lock:
+                stats['connected'] = False
+                stats['error'] = error_msg
         finally:
             if ser and ser.is_open:
                 try:
@@ -523,20 +538,21 @@ class AtosTAKClient:
 
 @app.route('/api/tags')
 def api_tags():
-    result = {}
-    for i in range(1, 101):
-        tag_id = str(i)
-        tag_key = int(tag_id)
-        if tag_key in tag_data:
-            t = tag_data[tag_key].copy()
-            t['stale'] = get_tag_staleness(t)
-        else:
-            t = {'stale': True, 'bad_gps': True}
-        cfg = forwarding_config['tags'].get(tag_id, {})
-        t['forward'] = cfg.get('forward', forwarding_config.get('forward_all', False))
-        t['callsign'] = cfg.get('callsign', '')
-        result[tag_id] = t
-    return jsonify(result)
+    with data_lock:
+        result = {}
+        for i in range(1, 101):
+            tag_id = str(i)
+            tag_key = int(tag_id)
+            if tag_key in tag_data:
+                t = tag_data[tag_key].copy()
+                t['stale'] = get_tag_staleness(t)
+            else:
+                t = {'stale': True, 'bad_gps': True}
+            cfg = forwarding_config['tags'].get(tag_id, {})
+            t['forward'] = cfg.get('forward', forwarding_config.get('forward_all', False))
+            t['callsign'] = cfg.get('callsign', '')
+            result[tag_id] = t
+        return jsonify(result)
 
 @app.route('/api/tak_server', methods=['GET', 'POST'])
 def api_tak_server():
