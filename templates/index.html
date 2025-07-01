@@ -5,122 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Marshall TAK Forwarder</title>
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #f5f5f5; 
-            margin: 0; 
-            padding: 0; 
-        }
-        .header { 
-            background: #2c3e50; 
-            color: white; 
-            padding: 20px; 
-            border-radius: 10px; 
-            margin: 20px; 
-        }
-        .container { 
-            max-width: 1200px; 
-            margin: 0 auto; 
-            padding: 20px; 
-        }
-        .tag-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            background: white; 
-            border-radius: 8px; 
-            overflow: hidden; 
-        }
-        .tag-table th, .tag-table td { 
-            padding: 10px; 
-            text-align: left; 
-            border-bottom: 1px solid #eee; 
-        }
-        .tag-table th { 
-            background: #34495e; 
-            color: white; 
-        }
-        .tag-table tr:last-child td { 
-            border-bottom: none; 
-        }
-        .stale-row { 
-            opacity: 0.5; 
-            background: #f8f9fa !important;
-        }
-        .status-active {
-            color: #28a745;
-            font-weight: 600;
-        }
-        .status-stale {
-            color: #dc3545;
-            font-weight: 600;
-        }
+        body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
+        .header{background:#2c3e50;color:#fff;padding:20px;margin:0 0 20px 0;}
+        .container{max-width:1200px;margin:0 auto;padding:20px;}
+        table{width:100%;border-collapse:collapse;background:#fff;}
+        th,td{padding:8px;border-bottom:1px solid #ddd;}
+        th{background:#34495e;color:#fff;}
+        .stale-row{opacity:0.5;background:#f8f9fa;}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚀 Marshall TAK Forwarder</h1>
-        <p>Real-time tag monitoring and TAK forwarding</p>
+<div class="header">
+    <h1>🚀 Marshall TAK Forwarder</h1>
+    <div>
+        TAK Server: <input id="tak-ip" size="15"> : <input id="tak-port" size="5">
+        <button onclick="updateTak()">Update</button>
+        <button id="forward-all">Forward All</button>
     </div>
-    <div class="container">
-        <table class="tag-table">
-            <thead>
-                <tr>
-                    <th>Tag</th>
-                    <th>Status</th>
-                    <th>Lat</th>
-                    <th>Lon</th>
-                    <th>Alt (ft)</th>
-                    <th>Battery</th>
-                    <th>Last Update</th>
-                </tr>
-            </thead>
-            <tbody id="tag-table-body">
-                <!-- Tag rows will be populated here -->
-            </tbody>
-        </table>
+</div>
+<div class="container">
+    <table class="tag-table">
+        <thead>
+            <tr>
+                <th>Tag</th><th>Status</th><th>Lat</th><th>Lon</th><th>Alt(ft)</th><th>Battery</th><th>Last Update</th><th>Forward</th><th>Callsign</th>
+            </tr>
+        </thead>
+        <tbody id="tag-table-body"></tbody>
+    </table>
+    <div style="margin-top:20px;">
+        <h3>Templates</h3>
+        <select id="templates"></select>
+        <input id="template-name" placeholder="name">
+        <button onclick="saveTemplate()">Save</button>
+        <button onclick="loadTemplate()">Load</button>
+        <button onclick="deleteTemplate()">Delete</button>
+        <button onclick="renameTemplate()">Rename</button>
     </div>
-    <script>
-        function fetchTags() {
-            fetch('/api/data').then(r => r.json()).then(data => {
-                const tbody = document.getElementById('tag-table-body');
-                tbody.innerHTML = '';
-                
-                if (Object.keys(data.tags).length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">No tag data available</td></tr>';
-                    return;
-                }
-                
-                Object.entries(data.tags).forEach(([tag_id, tag]) => {
-                    const tr = document.createElement('tr');
-                    const isStale = tag.stale;
-                    
-                    if (isStale) {
-                        tr.classList.add('stale-row');
-                    }
-                    
-                    tr.innerHTML = `
-                        <td><strong>${tag_id}</strong></td>
-                        <td class="${isStale ? 'status-stale' : 'status-active'}">
-                            ${isStale ? 'Stale' : 'Active'}
-                        </td>
-                        <td>${tag.latitude !== undefined ? tag.latitude.toFixed(6) : 'N/A'}</td>
-                        <td>${tag.longitude !== undefined ? tag.longitude.toFixed(6) : 'N/A'}</td>
-                        <td>${tag.altitude_ft !== undefined ? tag.altitude_ft.toFixed(1) : 'N/A'}</td>
-                        <td>${tag.battery_voltage !== undefined ? tag.battery_voltage.toFixed(2) + 'V' : 'N/A'}</td>
-                        <td>${tag.timestamp || 'N/A'}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }).catch(error => {
-                console.error('Error fetching tags:', error);
-                document.getElementById('tag-table-body').innerHTML = 
-                    '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc3545;">Error loading data</td></tr>';
-            });
-        }
-        
-        // Initialize
-        fetchTags();
-        setInterval(fetchTags, 2000);
-    </script>
+</div>
+<script>
+function updateTable(tags){
+  const tbody=document.getElementById('tag-table-body');
+  tbody.innerHTML='';
+  for(const [id,tag] of Object.entries(tags)){
+    const tr=document.createElement('tr');
+    if(tag.stale) tr.classList.add('stale-row');
+    tr.innerHTML=`<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.latitude!==undefined?tag.latitude.toFixed(6):'N/A'}</td><td>${tag.longitude!==undefined?tag.longitude.toFixed(6):'N/A'}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp||'N/A'}</td>`;
+    const f=document.createElement('td');
+    const chk=document.createElement('input');
+    chk.type='checkbox';chk.checked=tag.forward;
+    chk.onchange=()=>{fetch(`/api/tag/${id}/forward`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward:chk.checked})});};
+    f.appendChild(chk);tr.appendChild(f);
+    const c=document.createElement('td');
+    const inp=document.createElement('input');
+    inp.value=tag.callsign;inp.onchange=()=>{fetch(`/api/tag/${id}/callsign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callsign:inp.value})});};
+    c.appendChild(inp);tr.appendChild(c);
+    tbody.appendChild(tr);
+  }
+}
+function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);} 
+function fetchConfigs(){
+  fetch('/api/tak_server').then(r=>r.json()).then(d=>{document.getElementById('tak-ip').value=d.ip;document.getElementById('tak-port').value=d.port;});
+  fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
+  fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
+}
+function updateTak(){const ip=document.getElementById('tak-ip').value;const port=document.getElementById('tak-port').value;fetch('/api/tak_server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip,port})});}
+ document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
+function saveTemplate(){const name=document.getElementById('template-name').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',name})}).then(fetchConfigs);}
+function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
+function deleteTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})}).then(fetchConfigs);}
+function renameTemplate(){const name=document.getElementById('templates').value;const newName=document.getElementById('template-name').value;if(!name||!newName)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rename',name,new_name:newName})}).then(fetchConfigs);}
+fetchConfigs();fetchTags();setInterval(fetchTags,2000);
+</script>
 </body>
 </html>
