@@ -511,7 +511,10 @@ def api_tags():
             t = {'stale': True, 'bad_gps': True}
         cfg = forwarding_config['tags'].get(tag_id, {})
         t['forward'] = cfg.get('forward', forwarding_config.get('forward_all', False))
-        t['callsign'] = cfg.get('callsign') or f'Tag{tag_id}'
+        callsign = cfg.get('callsign')
+        if not callsign:
+            callsign = tag_id
+        t['callsign'] = callsign
         t['color'] = cfg.get('color', 'white')
         result[tag_id] = t
     return jsonify(result)
@@ -597,7 +600,8 @@ def api_reset_tags():
     global tag_data, forwarding_config
     # Reset persistent config for all tags
     for tag_id in list(forwarding_config['tags'].keys()):
-        forwarding_config['tags'][tag_id]['callsign'] = str(tag_id)
+        if 'callsign' in forwarding_config['tags'][tag_id]:
+            del forwarding_config['tags'][tag_id]['callsign']
         forwarding_config['tags'][tag_id]['color'] = 'white'
     save_forwarding_config(forwarding_config)
     tag_data.clear()
