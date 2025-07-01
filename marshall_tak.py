@@ -357,23 +357,27 @@ def get_data():
 def index():
     return render_template('index.html')
 
+@app.route('/display')
+def display():
+    return render_template('display.html')
+
 # ==== Serial reader thread ====
 
 def serial_reader():
-    global tag_data, packet_history, stats
+    global tag_data, packet_history, stats, tak_client
     initialize_log_files()
     while True:
         ser = None
         try:
-            print("Attempting to connect to COM4...")
-            ser = serial.Serial('COM4', 115200, timeout=0.1)
+            print("Attempting to connect to /dev/ttyACM0...")
+            ser = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1)
             ser.setDTR(True)
             ser.setRTS(True)
             ser.flushInput()
             ser.flushOutput()
             stats['connected'] = True
             stats['error'] = None
-            print("✅ Connected to COM4")
+            print("✅ Connected to /dev/ttyACM0")
             buffer = b''
             while True:
                 try:
@@ -381,6 +385,7 @@ def serial_reader():
                         data = ser.read(ser.in_waiting)
                         buffer += data
                         packets, buffer = extract_packets_from_buffer(buffer)
+                        tag_data_changed = False
                         for packet in packets:
                             stats['total_packets'] += 1
                             stats['last_update'] = datetime.now().strftime('%H:%M:%S')
@@ -399,6 +404,7 @@ def serial_reader():
                                     if len(packet_history) > 50:
                                         packet_history.pop(0)
                                     export_json()
+                                    tag_data_changed = True
                             elif len(packet) >= 3:
                                 result = parse_fiftysix_packet(packet)
                                 if result:
@@ -406,6 +412,9 @@ def serial_reader():
                                     if len(packet_history) > 50:
                                         packet_history.pop(0)
                                     export_json()
+                        # After processing all packets, send updates for changed tags
+                        if tag_data_changed:
+                            tak_client.send_updates_for_changed_tags(tag_data, forwarding_config, tak_server_config)
                     time.sleep(0.01)
                 except serial.SerialException as e:
                     print(f"Serial communication error: {e}")
@@ -419,7 +428,7 @@ def serial_reader():
             stats['connected'] = False
             stats['error'] = error_msg
         except PermissionError as e:
-            error_msg = f"Permission error accessing COM4: {e}"
+            error_msg = f"Permission error accessing /dev/ttyACM0: {e}"
             print(f"❌ {error_msg}")
             print("💡 This usually means the port is in use or the device disconnected")
             stats['connected'] = False
@@ -443,28 +452,12 @@ def serial_reader():
 class AtosTAKClient:
     def __init__(self):
         self.json_file = "latest_tag_data.json"
-        self.last_data: Dict[str, Any] = {}
-        self.last_sent: Dict[str, datetime] = {}
-        self.update_interval = 5
+        self.last_sent_data: Dict[str, Any] = {}
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    def load_tag_data(self) -> Optional[Dict[str, Any]]:
-        try:
-            if not os.path.exists(self.json_file):
-                print(f"⚠️  JSON file {self.json_file} not found")
-                return None
-            with open(self.json_file, 'r') as f:
-                data = json.load(f)
-            if not data or 'tags' not in data:
-                print("⚠️  No valid tag data in JSON file")
-                return None
-            return data
-        except Exception as e:
-            print(f"❌ Error loading JSON data: {e}")
-            return None
 
     def create_cot_message(self, tag_id: str, tag_data: Dict[str, Any], callsign: str) -> Optional[bytes]:
         try:
+            color = tag_data.get('color', 'white').capitalize().replace('_', ' ')
             lat = f"{tag_data.get('latitude', 0):.7f}"
             lon = f"{tag_data.get('longitude', 0):.7f}"
             hae = f"{tag_data.get('altitude', 0):.3f}"
@@ -472,52 +465,36 @@ class AtosTAKClient:
             temp = f"{tag_data.get('temperature', 0):.0f}"
             now = datetime.now(timezone.utc)
             time_str = now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-            cot_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<event version="2.0" uid="atos-{tag_id}-60eabd39-32ed-436f-9a17-4a8add4d24fc" type="a-f-G-U-C-I" time="{time_str}" start="{time_str}" stale="{(now.replace(microsecond=0) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')}" how="m-g" access="Undefined"><point lat="{lat}" lon="{lon}" hae="{hae}" ce="1.3" le="2.0"/><detail><track vspeed="0.0" course="270.0" slope="0.0" speed="0.2777777777777778"/><link uid="ANDROID-3e844b3d264f49fb" type="a-f-G-U-C-I" parent_callsign="Atos Tablet" relation="p-p"/><contact callsign="PAX {callsign}"/><__atos color="White" tag_type="Personnel" manifest="Course " alarm="0" temp_c="{temp}" voltage="{battery}"><attributes PAX_Type="" Team_Frequency="" Special_Equipment="" Frequency="" Remark=""/></__atos><archive/></detail></event>'''
+            cot_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<event version="2.0" uid="atos-{tag_id}-60eabd39-32ed-436f-9a17-4a8add4d24fc" type="a-f-G-U-C-I" time="{time_str}" start="{time_str}" stale="{(now.replace(microsecond=0) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')}" how="m-g" access="Undefined"><point lat="{lat}" lon="{lon}" hae="{hae}" ce="1.3" le="2.0"/><detail><track vspeed="0.0" course="270.0" slope="0.0" speed="0.2777777777777778"/><link uid="ANDROID-3e844b3d264f49fb" type="a-f-G-U-C-I" parent_callsign="ATOS Forwarder" relation="p-p"/><contact callsign="{callsign}"/><__atos color="{color}" tag_type="Personnel" manifest="Course " alarm="0" temp_c="{temp}" voltage="{battery}"><attributes PAX_Type="" Team_Frequency="" Special_Equipment="" Frequency="" Remark=""/></__atos><archive/></detail></event>'''
             return cot_xml.encode('utf-8')
         except Exception as e:
             print(f"❌ Error creating COT message for tag {tag_id}: {e}")
             return None
 
-    async def run(self):
-        global forwarding_config, tak_server_config
-        print("🚀 ATOS TAK Client (Direct UDP) Starting...")
-        print("=" * 50)
-        while True:
-            try:
-                data = self.load_tag_data()
-                if data and 'tags' in data:
-                    tags = data['tags']
-                    stats_info = data.get('stats', {})
-                    print(f"📡 Processing {len(tags)} tags (Total packets: {stats_info.get('total_packets', 0)})")
-                    for tag_id, tag in tags.items():
-                        if tag.get('stale', False):
-                            continue
-                        cfg = forwarding_config['tags'].get(str(tag_id), {})
-                        should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
-                        if not should_forward:
-                            continue
-                        use_data = tag
-                        if tag.get('bad_gps', False):
-                            last = self.last_data.get(str(tag_id))
-                            if last and not last.get('bad_gps', False):
-                                use_data = last
-                        callsign = cfg.get('callsign', str(tag_id))
-                        cot_message = self.create_cot_message(str(tag_id), use_data, callsign if callsign else str(tag_id))
-                        if cot_message:
-                            host = tak_server_config.get('ip', '127.0.0.1')
-                            port = tak_server_config.get('port', 0)
-                            print(f"[DEBUG] Sending to {host}:{port} for Tag {tag_id}:")
-                            self.sock.sendto(cot_message, (host, port))
-                            self.last_sent[tag_id] = datetime.utcnow()
-                            print(f"✅ Sent COT for Tag {tag_id}: {use_data.get('latitude', 0):.6f}°, {use_data.get('longitude', 0):.6f}°, {use_data.get('battery_voltage', 0)}V")
-                        if not tag.get('bad_gps', False):
-                            self.last_data[str(tag_id)] = tag
-                else:
-                    print("⏳ Waiting for valid tag data...")
-                await asyncio.sleep(self.update_interval)
-            except Exception as e:
-                print(f"❌ Error in main loop: {e}")
-                await asyncio.sleep(5)
+    def send_updates_for_changed_tags(self, tags: Dict[int, Any], forwarding_config, tak_server_config):
+        for tag_id, tag in tags.items():
+            if tag.get('stale', False):
+                continue
+            cfg = forwarding_config['tags'].get(str(tag_id), {})
+            should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
+            if not should_forward:
+                continue
+            # Only send if data has changed since last send
+            last = self.last_sent_data.get(tag_id)
+            # Merge color from config into tag data
+            tag_to_send = tag.copy()
+            tag_to_send['color'] = cfg.get('color', 'white')
+            if last == tag_to_send:
+                continue
+            callsign = cfg.get('callsign') or f'Tag{tag_id}'
+            cot_message = self.create_cot_message(str(tag_id), tag_to_send, callsign)
+            if cot_message:
+                host = tak_server_config.get('ip', '127.0.0.1')
+                port = tak_server_config.get('port', 0)
+                print(f"[DEBUG] Sending to {host}:{port} for Tag {tag_id}:")
+                self.sock.sendto(cot_message, (host, port))
+                self.last_sent_data[tag_id] = tag_to_send.copy()
+                print(f"✅ Sent COT for Tag {tag_id}: {tag_to_send.get('latitude', 0):.6f}°, {tag_to_send.get('longitude', 0):.6f}°, {tag_to_send.get('battery_voltage', 0)}V")
 
 # ==== API endpoints for web controls ====
 
@@ -534,7 +511,8 @@ def api_tags():
             t = {'stale': True, 'bad_gps': True}
         cfg = forwarding_config['tags'].get(tag_id, {})
         t['forward'] = cfg.get('forward', forwarding_config.get('forward_all', False))
-        t['callsign'] = cfg.get('callsign', '')
+        t['callsign'] = cfg.get('callsign') or f'Tag{tag_id}'
+        t['color'] = cfg.get('color', 'white')
         result[tag_id] = t
     return jsonify(result)
 
@@ -575,6 +553,14 @@ def api_tag_callsign(tag_id):
     global forwarding_config
     data = request.get_json(force=True)
     forwarding_config['tags'].setdefault(tag_id, {})['callsign'] = data.get('callsign', '')
+    save_forwarding_config(forwarding_config)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/tag/<tag_id>/color', methods=['POST'])
+def api_tag_color(tag_id):
+    global forwarding_config
+    data = request.get_json(force=True)
+    forwarding_config['tags'].setdefault(tag_id, {})['color'] = data.get('color', 'white')
     save_forwarding_config(forwarding_config)
     return jsonify({'status': 'ok'})
 
@@ -668,21 +654,17 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def start_tak_client():
-    asyncio.run(AtosTAKClient().run())
-
-
 def main():
+    global tak_client
     print("Live Marshall TAK Forwarder")
     print("=" * 55)
     signal.signal(signal.SIGINT, signal_handler)
     print("🎯 Purpose: Overnight voltage threshold testing")
     print("📝 Logging: Every tag update, voltage reading, and status change")
     print("📊 Analysis: Automatic voltage threshold analysis on shutdown")
+    tak_client = AtosTAKClient()
     serial_thread = threading.Thread(target=serial_reader, daemon=True)
     serial_thread.start()
-    tak_thread = threading.Thread(target=start_tak_client, daemon=True)
-    tak_thread.start()
     time.sleep(2)
     print("🌐 Opening web interface...")
     webbrowser.open('http://localhost:5000')
@@ -690,7 +672,12 @@ def main():
     print("📝 Comprehensive logging active - all data being recorded")
     print("⏰ Run overnight to collect voltage threshold data")
     print("🛑 Press Ctrl+C to stop and analyze results")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    print("About to start Flask web server...")
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=False)
+    except Exception as e:
+        print(f"Flask failed to start: {e}")
+    print("Flask web server has stopped.")
 
 
 if __name__ == "__main__":

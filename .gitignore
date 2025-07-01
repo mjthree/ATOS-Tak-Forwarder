@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Application specific
+# Log files and data files
+comprehensive_logs/
+command_link_logs/
+parsed_data/
+*.log
+*.jsonl
+*.csv
+
+# Runtime data files
+latest_tag_data.json
+*.json.bak
+
+# Temporary files
+*.tmp
+*.temp
+
+# Configuration files that might contain sensitive data
+# Uncomment if you want to exclude config files
+# tak_server_config.json
+# forwarding_config.json
+# templates.json
+
+# Backup files
+*.bak
+*.backup
+*_previous.py 

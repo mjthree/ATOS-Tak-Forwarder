@@ -1,0 +1,28 @@
+[Unit]
+Description=ATOS Tracker Dashboard Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/atos-newest
+Environment=PYTHONPATH=/home/pi/atos-newest
+ExecStart=/usr/bin/python3 /home/pi/atos-newest/marshall_tak.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Give the service time to start up
+TimeoutStartSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/pi/atos-newest
+
+[Install]
+WantedBy=multi-user.target 

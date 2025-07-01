@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marshall TAK Forwarder</title>
+    <title>ATOS Forwarder</title>
     <style>
         body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
         .header{background:#2c3e50;color:#fff;padding:20px;margin:0 0 20px 0;}
@@ -16,7 +16,7 @@
 </head>
 <body>
 <div class="header">
-    <h1>🚀 Marshall TAK Forwarder</h1>
+    <h1>🚀 ATOS Forwarder</h1>
     <div>
         TAK Server: <input id="tak-ip" size="15"> : <input id="tak-port" size="5">
         <button onclick="updateTak()">Update</button>
@@ -27,7 +27,7 @@
     <table class="tag-table">
         <thead>
             <tr>
-                <th>Tag</th><th>Status</th><th>Lat</th><th>Lon</th><th>Alt(ft)</th><th>Battery</th><th>Last Update</th><th>Forward</th><th>Callsign</th>
+                <th>Tag</th><th>Status</th><th>GPS</th><th>Lat</th><th>Lon</th><th>Alt(ft)</th><th>Battery</th><th>Last Update</th><th>Forward</th><th>Color</th><th>Callsign</th>
             </tr>
         </thead>
         <tbody id="tag-table-body"></tbody>
@@ -45,6 +45,27 @@
 <script>
 let refreshTimer;
 let isEditing=false;
+const colorOptions = [
+  'white','yellow','orange','magenta','red','maroon','purple','blue','cyan','teal','green','dark_green'
+];
+function createColorDropdown(selectedColor, id) {
+  const sel = document.createElement('select');
+  colorOptions.forEach(color => {
+    const opt = document.createElement('option');
+    opt.value = color;
+    opt.text = color.replace('_',' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (color === selectedColor) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.onchange = () => {
+    fetch(`/api/tag/${id}/color`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({color: sel.value})
+    });
+  };
+  return sel;
+}
 function startAutoRefresh(){refreshTimer=setInterval(fetchTags,2000);}
 function stopAutoRefresh(){clearInterval(refreshTimer);}
 function updateTable(tags){
@@ -54,15 +75,19 @@ function updateTable(tags){
   for(const [id,tag] of Object.entries(tags)){
     const tr=document.createElement('tr');
     if(tag.stale) tr.classList.add('stale-row');
-    tr.innerHTML=`<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.latitude!==undefined?tag.latitude.toFixed(6):'N/A'}</td><td>${tag.longitude!==undefined?tag.longitude.toFixed(6):'N/A'}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp||'N/A'}</td>`;
+    tr.innerHTML = `<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.bad_gps?'Bad':'Good'}</td><td>${tag.latitude!==undefined?tag.latitude.toFixed(6):'N/A'}</td><td>${tag.longitude!==undefined?tag.longitude.toFixed(6):'N/A'}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp?tag.timestamp.slice(0,8):'N/A'}</td>`;
     const f=document.createElement('td');
     const chk=document.createElement('input');
     chk.type='checkbox';chk.checked=tag.forward;
     chk.onchange=()=>{fetch(`/api/tag/${id}/forward`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward:chk.checked})});};
-    f.appendChild(chk);tr.appendChild(f);
+    f.appendChild(chk);
+    tr.appendChild(f);
+    const colorTd = document.createElement('td');
+    colorTd.appendChild(createColorDropdown(tag.color||'white', id));
+    tr.appendChild(colorTd);
     const c=document.createElement('td');
     const inp=document.createElement('input');
-    inp.value=tag.callsign;
+    inp.value=tag.callsign||`Tag${id}`;
     inp.readOnly=true;
     const editBtn=document.createElement('button');
     editBtn.textContent='Edit';
