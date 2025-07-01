@@ -526,8 +526,9 @@ def api_tags():
     result = {}
     for i in range(1, 101):
         tag_id = str(i)
-        if tag_id in tag_data:
-            t = tag_data[tag_id].copy()
+        tag_key = int(tag_id)
+        if tag_key in tag_data:
+            t = tag_data[tag_key].copy()
             t['stale'] = get_tag_staleness(t)
         else:
             t = {'stale': True, 'bad_gps': True}
