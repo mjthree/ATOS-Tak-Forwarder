@@ -395,6 +395,30 @@ def cot_sender():
 def index():
     return render_template('index.html')
 
+@app.route('/api/data')
+def get_data():
+    """Return data in the format expected by the simplified dashboard"""
+    now = time.time()
+    tags_out = {}
+    for tag_id, tag in tag_state.items():
+        tag_out = tag.copy()
+        # Active = seen within last 15 seconds via serial
+        last_seen = tag.get('last_seen', 0)
+        tag_out['active'] = (now - last_seen) < 15
+        tag_out['stale'] = not tag_out['active']
+        tags_out[tag_id] = tag_out
+    
+    return jsonify({
+        'tags': tags_out,
+        'stats': {
+            'total_packets': 0,  # Not tracking this in web forwarder
+            'last_update': datetime.now().isoformat(),
+            'connected': True,  # Assume connected if we have data
+            'error': None
+        },
+        'history': []  # Not tracking history in web forwarder
+    })
+
 @app.route('/api/tags')
 def get_tags():
     # Return tag state with active, bad_gps, and last_seen for dashboard

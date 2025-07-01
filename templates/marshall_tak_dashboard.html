@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marshall Radio TAK Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            background: #ecf0f1;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .status-indicator.active {
+            background: #27ae60;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 0;
+            min-height: 600px;
+        }
+
+        .data-section {
+            padding: 30px;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-left: 1px solid #dee2e6;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .tag-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .tag-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #3498db;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .tag-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .tag-card.no-gps {
+            opacity: 0.5;
+            filter: grayscale(1);
+            position: relative;
+        }
+
+        .badge.no-gps {
+            background: #e74c3c;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 2;
+        }
+
+        .tag-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .tag-id {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .tag-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .tag-status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .tag-status.inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .tag-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .data-item {
+            text-align: center;
+        }
+
+        .data-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+
+        .data-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .coordinates {
+            grid-column: 1 / -1;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .config-form {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .tak-controls {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .tak-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+
+        .tak-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .tak-indicator.active {
+            background: #27ae60;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        .last-update {
+            font-size: 0.8em;
+            color: #95a5a6;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .config-section {
+                border-left: none;
+                border-top: 1px solid #dee2e6;
+            }
+            
+            .tag-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Marshall Radio TAK Dashboard</h1>
+            <p>Real-time asset tracking with TAK integration</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="serial-status"></div>
+                <span>Serial Connection</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator" id="tak-status"></div>
+                <span>TAK Server</span>
+            </div>
+            <div class="status-item">
+                <span>Last Update: <span id="last-update">Never</span></span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="data-section">
+                <h2 class="section-title">Live Tag Data</h2>
+                <div class="tag-grid" id="tag-grid">
+                    <div class="no-data">No tag data available</div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h2 class="section-title">TAK Configuration</h2>
+                
+                {% if tak_available %}
+                <div class="tak-controls">
+                    <div class="tak-status">
+                        <div class="tak-indicator" id="tak-indicator"></div>
+                        <span>TAK Integration: <span id="tak-status-text">Disabled</span></span>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="startTAK()">Start TAK</button>
+                        <button class="btn btn-danger" onclick="stopTAK()">Stop TAK</button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="tak-controls">
+                    <p style="color: #e74c3c; text-align: center;">PyTAK not available - TAK features disabled</p>
+                </div>
+                {% endif %}
+
+                <h3 style="margin: 20px 0 15px 0; color: #2c3e50;">Tag Configuration</h3>
+                
+                {% for tag_id, config in tag_configs.items() %}
+                <div class="config-form">
+                    <h4 style="margin-bottom: 15px; color: #2c3e50;">Tag {{ tag_id }}</h4>
+                    
+                    <div class="form-group">
+                        <label class="form-label">TAK ID</label>
+                        <input type="text" class="form-control" id="tak-id-{{ tag_id }}" 
+                               value="{{ config.tak_id }}" placeholder="Enter TAK ID">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Icon Type</label>
+                            <select class="form-control" id="icon-type-{{ tag_id }}">
+                                {% for icon_code, icon_name in icons %}
+                                <option value="{{ icon_code }}" {% if icon_code == config.icon_type %}selected{% endif %}>
+                                    {{ icon_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Color</label>
+                            <select class="form-control" id="color-{{ tag_id }}">
+                                {% for color_code, color_name in colors %}
+                                <option value="{{ color_code }}" {% if color_code == config.color %}selected{% endif %}>
+                                    {{ color_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="enabled-{{ tag_id }}" {% if config.enabled %}checked{% endif %}>
+                            Enable this tag
+                        </label>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="updateConfig({{ tag_id }})">Update Config</button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lastUpdate = new Date();
+        
+        // Update status indicators
+        function updateStatus() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    // Update serial status
+                    const serialStatus = document.getElementById('serial-status');
+                    serialStatus.className = 'status-indicator active';
+                    
+                    // Update TAK status
+                    const takStatus = document.getElementById('tak-status');
+                    const takIndicator = document.getElementById('tak-indicator');
+                    const takStatusText = document.getElementById('tak-status-text');
+                    
+                    if (data.tak_enabled) {
+                        takStatus.className = 'status-indicator active';
+                        takIndicator.className = 'tak-indicator active';
+                        takStatusText.textContent = 'Active';
+                    } else {
+                        takStatus.className = 'status-indicator';
+                        takIndicator.className = 'tak-indicator';
+                        takStatusText.textContent = 'Disabled';
+                    }
+                    
+                    // Update tag data
+                    updateTagDisplay(data.tags);
+                    
+                    // Update last update time
+                    lastUpdate = new Date();
+                    document.getElementById('last-update').textContent = lastUpdate.toLocaleTimeString();
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    document.getElementById('serial-status').className = 'status-indicator';
+                });
+        }
+        
+        // Update tag display
+        function updateTagDisplay(tags) {
+            const tagGrid = document.getElementById('tag-grid');
+            
+            if (Object.keys(tags).length === 0) {
+                tagGrid.innerHTML = '<div class="no-data">No tag data available</div>';
+                return;
+            }
+            
+            tagGrid.innerHTML = '';
+            
+            Object.entries(tags).forEach(([tagId, tag]) => {
+                const tagCard = document.createElement('div');
+                tagCard.className = 'tag-card' + (tag.bad_gps ? ' no-gps' : '');
+                
+                const isActive = (Date.now() / 1000) - tag.last_seen < 60; // Active if seen in last 60 seconds
+                
+                tagCard.innerHTML = `
+                    <div class="tag-header">
+                        <div class="tag-id">Tag ${tag.tag_id}</div>
+                        <div class="tag-status ${isActive ? 'active' : 'inactive'}">
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </div>
+                        ${tag.bad_gps ? '<span class="badge no-gps">No GPS</span>' : ''}
+                    </div>
+                    <div class="tag-data">
+                        <div class="coordinates">
+                            <div class="data-label">Location</div>
+                            <div class="data-value">${tag.bad_gps ? 'No Fix' : (tag.latitude.toFixed(6) + '°, ' + tag.longitude.toFixed(6) + '°')}</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Altitude</div>
+                            <div class="data-value">${tag.bad_gps ? '—' : (tag.altitude_feet.toFixed(1) + ' ft')}</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">Battery</div>
+                            <div class="data-value">${tag.battery_voltage.toFixed(2)} V</div>
+                        </div>
+                    </div>
+                `;
+                
+                tagGrid.appendChild(tagCard);
+            });
+        }
+        
+        // Update tag configuration
+        function updateConfig(tagId) {
+            const config = {
+                tag_id: tagId,
+                tak_id: document.getElementById(`tak-id-${tagId}`).value,
+                icon_type: document.getElementById(`icon-type-${tagId}`).value,
+                color: document.getElementById(`color-${tagId}`).value,
+                enabled: document.getElementById(`enabled-${tagId}`).checked
+            };
+            
+            fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(`Configuration updated for Tag ${tagId}`);
+                } else {
+                    alert('Error updating configuration');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating configuration');
+            });
+        }
+        
+        // TAK controls
+        function startTAK() {
+            fetch('/api/tak', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({action: 'start'})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('TAK client started');
+                } else {
+                    alert('Error starting TAK client: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error starting TAK client');
+            });
+        }
+        
+        function stopTAK() {
+            fetch('/api/tak', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({action: 'stop'})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('TAK client stopped');
+                } else {
+                    alert('Error stopping TAK client: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error stopping TAK client');
+            });
+        }
+        
+        // Update data every 2 seconds
+        setInterval(updateStatus, 2000);
+        
+        // Initial update
+        updateStatus();
+    </script>
+</body>
+</html> 

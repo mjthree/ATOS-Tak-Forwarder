@@ -1,0 +1,5 @@
+{"timestamp": "2025-06-30T04:55:53.899093", "tag_id": 1, "event": "tag_first_seen", "voltage": 3.57, "gps_status": "good"}
+{"timestamp": "2025-06-30T04:55:53.974439", "tag_id": 2, "event": "tag_first_seen", "voltage": 3.58, "gps_status": "good"}
+{"timestamp": "2025-06-30T04:55:54.059241", "tag_id": 3, "event": "tag_first_seen", "voltage": 3.59, "gps_status": "good"}
+{"timestamp": "2025-06-30T04:55:54.133113", "tag_id": 4, "event": "tag_first_seen", "voltage": 3.63, "gps_status": "good"}
+{"timestamp": "2025-06-30T04:55:54.207075", "tag_id": 5, "event": "tag_first_seen", "voltage": 3.6, "gps_status": "good"}

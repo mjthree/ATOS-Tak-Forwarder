@@ -1,0 +1,3 @@
+{"timestamp": "2025-06-30T15:45:01.937160", "tag_id": 89, "event": "tag_first_seen", "voltage": 4.03, "gps_status": "good"}
+{"timestamp": "2025-06-30T15:45:03.324467", "tag_id": 3, "event": "tag_first_seen", "voltage": 3.99, "gps_status": "good"}
+{"timestamp": "2025-06-30T15:45:03.397724", "tag_id": 4, "event": "tag_first_seen", "voltage": 3.97, "gps_status": "good"}

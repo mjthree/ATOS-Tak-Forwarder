@@ -1,0 +1,11 @@
+Comprehensive Tag Logging Started: 2025-06-30 11:43:46.857345
+Log Files Created:
+  - All updates: comprehensive_logs\all_tag_updates_20250630_114346.jsonl
+  - Voltage tracking: comprehensive_logs\voltage_tracking_20250630_114346.csv
+  - Status changes: comprehensive_logs\tag_status_20250630_114346.jsonl
+  - Summary: comprehensive_logs\logging_summary_20250630_114346.txt
+
+Purpose: Overnight voltage threshold testing
+Monitoring: All tag updates with timestamps
+Voltage tracking: Every voltage reading per tag
+Status changes: GPS changes, voltage drops >= 0.1V

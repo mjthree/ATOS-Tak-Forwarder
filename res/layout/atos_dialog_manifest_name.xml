@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent">
-        <TextView android:textColor="@color/white" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/manifest_name" />
-        <EditText android:textColor="@color/white" android:textColorHint="@color/light_grey" android:gravity="center" android:id="@id/edit_dlg_manifest_new_name" android:layout_width="fill_parent" android:layout_height="wrap_content" android:digits="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -" />
-    </LinearLayout>
-    <CheckBox android:textColor="@color/white" android:id="@id/chk_dlg_manifest_include_active_tags" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginTop="24.0sp" android:layout_marginBottom="24.0sp" android:text="Include Active Tags" />
-</LinearLayout>

@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<TextView android:textSize="18.0sp" android:textStyle="normal" android:textColor="@color/med_grey" android:textColorHint="@color/light_grey" android:gravity="start|center" android:background="@color/darker_gray" android:padding="2.0dip" android:layout_width="fill_parent" android:layout_height="48.0dip" android:hint="Select Track Type" android:textScaleX="1.0" android:layout_marginStart="2.0dip"
-  xmlns:android="http://schemas.android.com/apk/res/android" />
