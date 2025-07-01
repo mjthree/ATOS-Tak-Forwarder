@@ -1,0 +1,20 @@
+{
+  "analysis_timestamp": "2025-07-01T06:57:27.571647",
+  "tag_analysis": {
+    "1": {
+      "total_readings": 1,
+      "min_voltage": 4.05,
+      "max_voltage": 4.05,
+      "avg_voltage": 4.05,
+      "final_voltage": 4.05,
+      "voltage_range": 0.0,
+      "last_seen": "2025-07-01T06:57:21.606561"
+    }
+  },
+  "summary": {
+    "total_tags": 1,
+    "lowest_final_voltage": 4.05,
+    "highest_final_voltage": 4.05,
+    "avg_final_voltage": 4.05
+  }
+}

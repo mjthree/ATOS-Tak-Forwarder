@@ -1,0 +1,65 @@
+{
+  "analysis_timestamp": "2025-07-01T06:06:53.986911",
+  "tag_analysis": {
+    "89": {
+      "total_readings": 60,
+      "min_voltage": 3.56,
+      "max_voltage": 3.64,
+      "avg_voltage": 3.59,
+      "final_voltage": 3.61,
+      "voltage_range": 0.08,
+      "last_seen": "2025-07-01T06:06:52.487212"
+    },
+    "1": {
+      "total_readings": 62,
+      "min_voltage": 4.06,
+      "max_voltage": 4.14,
+      "avg_voltage": 4.1,
+      "final_voltage": 4.11,
+      "voltage_range": 0.08,
+      "last_seen": "2025-07-01T06:06:53.717065"
+    },
+    "2": {
+      "total_readings": 63,
+      "min_voltage": 4.11,
+      "max_voltage": 4.21,
+      "avg_voltage": 4.16,
+      "final_voltage": 4.16,
+      "voltage_range": 0.1,
+      "last_seen": "2025-07-01T06:06:53.791212"
+    },
+    "3": {
+      "total_readings": 61,
+      "min_voltage": 4.08,
+      "max_voltage": 4.17,
+      "avg_voltage": 4.12,
+      "final_voltage": 4.12,
+      "voltage_range": 0.09,
+      "last_seen": "2025-07-01T06:06:53.867538"
+    },
+    "4": {
+      "total_readings": 62,
+      "min_voltage": 3.48,
+      "max_voltage": 3.53,
+      "avg_voltage": 3.51,
+      "final_voltage": 3.52,
+      "voltage_range": 0.05,
+      "last_seen": "2025-07-01T06:06:53.944832"
+    },
+    "5": {
+      "total_readings": 60,
+      "min_voltage": 4.03,
+      "max_voltage": 4.13,
+      "avg_voltage": 4.1,
+      "final_voltage": 4.04,
+      "voltage_range": 0.1,
+      "last_seen": "2025-07-01T06:06:52.019452"
+    }
+  },
+  "summary": {
+    "total_tags": 6,
+    "lowest_final_voltage": 3.52,
+    "highest_final_voltage": 4.16,
+    "avg_final_voltage": 3.9266666666666663
+  }
+}
