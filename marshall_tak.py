@@ -595,9 +595,7 @@ def api_templates():
 @app.route('/api/reset_tags', methods=['POST'])
 def api_reset_tags():
     global tag_data
-    for tag_id, tag in tag_data.items():
-        tag['color'] = 'white'
-        tag['callsign'] = str(tag_id)
+    tag_data.clear()
     return jsonify({'status': 'success'})
 
 # ==== Utility functions ====
