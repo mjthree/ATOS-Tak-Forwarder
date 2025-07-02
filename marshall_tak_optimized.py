@@ -887,6 +887,7 @@ def serial_reader():
                                         tag_data[tag_id] = result
                                     
                                     # Add to optimized queue for TAK forwarding
+                                    print(f"[DEBUG] Adding tag {tag_id} to optimized queue")
                                     optimized_queue.add_tag(tag_id, result, priority=1)
                                     log_tag_update(result)
                                     log_voltage_tracking(tag_id, result['battery_voltage'], datetime.now().isoformat())
