@@ -10,6 +10,8 @@ A large-screen dashboard for monitoring up to 100 ATOS trackers in real time.
 - **Comprehensive Logging:** Detailed logging of all tag updates and voltage data
 - **TAK Integration:** Forward tag data to TAK servers
 - **Service Mode:** Runs as a systemd service on Raspberry Pi
+- **Auto-browser Launch:** Automatically opens dashboard on service start
+- **Virtual Environment:** Uses Python virtual environment for clean dependency management
 
 ## Dashboard Display
 
@@ -30,10 +32,11 @@ A large-screen dashboard for monitoring up to 100 ATOS trackers in real time.
 2. **Serial connection** to your ATOS receiver (USB-to-Serial adapter)
 3. **Network access** for web dashboard
 4. **Git** installed on Raspberry Pi
+5. **Desktop environment** (for auto-browser launch)
 
 ### Installation Steps
 
-#### Option A: Git Deployment (Recommended)
+#### Option A: Automated Installation (Recommended)
 
 1. **Install Git on Raspberry Pi:**
    ```bash
@@ -44,59 +47,72 @@ A large-screen dashboard for monitoring up to 100 ATOS trackers in real time.
 2. **Clone the repository:**
    ```bash
    cd /home/pi
-   git clone https://github.com/yourusername/atos-tracker-dashboard.git atos-newest
+   git clone https://github.com/mjthree/ATOS-Tak-Forwarder.git atos-newest
    cd atos-newest
    ```
 
-#### Option B: Manual Copy
-
-1. **Copy the project to your Raspberry Pi:**
-   ```bash
-   cd /home/pi
-   # Copy your project files to /home/pi/atos-newest/
-   ```
-
-2. **Make scripts executable:**
+3. **Run the automated installer:**
    ```bash
    chmod +x install_service.sh
-   chmod +x setup_firewall.sh
-   ```
-
-3. **Install the service:**
-   ```bash
    sudo ./install_service.sh
    ```
 
-4. **Configure the firewall:**
-   ```bash
-   sudo ./setup_firewall.sh
-   ```
+   The installer will:
+   - ✅ Install required Python packages (`python3-venv`, `python3-full`)
+   - ✅ Create a Python virtual environment
+   - ✅ Install Python dependencies (Flask, pyserial, Werkzeug)
+   - ✅ Set up the systemd service
+   - ✅ Create desktop shortcut for easy access
+   - ✅ Configure proper permissions
 
-5. **Configure your serial port:**
+4. **Configure your serial port:**
    - Edit `marshall_tak.py` and change `COM4` to your Raspberry Pi's serial port
    - Common ports: `/dev/ttyUSB0`, `/dev/ttyACM0`, or `/dev/ttyAMA0`
    - Find your port: `ls /dev/tty*`
 
-6. **Start the service:**
+5. **Start the service:**
    ```bash
    sudo systemctl start atos-tracker
+   sudo systemctl enable atos-tracker
    ```
 
-7. **Check status:**
+6. **Access the dashboard:**
+   - The browser will automatically open to the dashboard
+   - Or manually go to: `http://[RASPBERRY_PI_IP]:5000/display`
+
+#### Option B: Manual Installation
+
+1. **Install dependencies:**
    ```bash
-   sudo systemctl status atos-tracker
+   sudo apt install python3-venv python3-full
+   ```
+
+2. **Create virtual environment:**
+   ```bash
+   cd /home/pi/atos-newest
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   deactivate
+   ```
+
+3. **Set up service manually:**
+   ```bash
+   sudo cp atos-tracker.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable atos-tracker
    ```
 
 ### Service Management
 
 ```bash
-# Start the service
+# Start the service (auto-opens browser)
 sudo systemctl start atos-tracker
 
 # Stop the service
 sudo systemctl stop atos-tracker
 
-# Restart the service
+# Restart the service (auto-opens browser)
 sudo systemctl restart atos-tracker
 
 # Check service status
@@ -112,9 +128,16 @@ sudo systemctl enable atos-tracker
 sudo systemctl disable atos-tracker
 ```
 
+### Desktop Shortcuts
+
+After installation, you'll have:
+- **ATOS Dashboard** desktop shortcut - Double-click to start service and open browser
+- **Manual startup script** - Run `./start_dashboard.sh` to start service and open browser
+
 ### Accessing the Dashboard
 
-- **Main Dashboard:** `http://[RASPBERRY_PI_IP]:5000/display`
+- **Auto-launch:** Browser opens automatically when service starts
+- **Manual access:** `http://[RASPBERRY_PI_IP]:5000/display`
 - **Control Interface:** `http://[RASPBERRY_PI_IP]:5000/`
 - **API Endpoint:** `http://[RASPBERRY_PI_IP]:5000/api/tags`
 
@@ -131,18 +154,27 @@ hostname -I
    sudo journalctl -u atos-tracker -n 50
    ```
 
-2. **Serial port issues:**
+2. **Browser doesn't open:**
+   - Check if desktop environment is running: `ps aux | grep -E "(xfce|gnome|kde|lxde|mate)"`
+   - Ensure DISPLAY is set: `export DISPLAY=:0`
+   - Check if Chromium is installed: `which chromium-browser`
+
+3. **Serial port issues:**
    - Check if your USB device is recognized: `lsusb`
    - Check available serial ports: `ls /dev/tty*`
    - Ensure user has serial port access: `sudo usermod -a -G dialout pi`
 
-3. **Firewall issues:**
+4. **Virtual environment issues:**
+   - Recreate virtual environment: `rm -rf venv && python3 -m venv venv`
+   - Reinstall dependencies: `source venv/bin/activate && pip install -r requirements.txt`
+
+5. **Firewall issues:**
    ```bash
    sudo ufw status
    sudo ufw allow 5000
    ```
 
-4. **Permission issues:**
+6. **Permission issues:**
    ```bash
    sudo chown -R pi:pi /home/pi/atos-newest
    chmod +x /home/pi/atos-newest/marshall_tak.py
@@ -154,8 +186,8 @@ For development and testing on your local machine:
 
 1. **Clone the repository (if not already done):**
    ```bash
-   git clone https://github.com/yourusername/atos-tracker-dashboard.git
-   cd atos-tracker-dashboard
+   git clone https://github.com/mjthree/ATOS-Tak-Forwarder.git
+   cd ATOS-Tak-Forwarder
    ```
 
 2. **Install dependencies:**
@@ -199,8 +231,6 @@ See `GIT_SETUP.md` for detailed Git workflow and best practices.
   `send_interval` which controls how often all valid tags are forwarded to the
   TAK server as a batch. The value can be adjusted on the web dashboard
   (2–60 seconds).
-
-
 - `templates.json` - Saved configuration templates
 
 ## Logging
@@ -217,12 +247,17 @@ The application creates comprehensive logs in the `comprehensive_logs/` director
 - `GET /api/tags` - Returns current status of all 100 tags
 - `GET /api/data` - Returns packet history and statistics
 - `POST /api/tak_server` - Configure TAK server settings (IP, port, and
-
   `send_interval`). The interval controls how often all valid tags are forwarded.
-
 - `POST /api/forward_all` - Enable/disable forwarding for all tags
 - `POST /api/tag/{id}/forward` - Configure individual tag forwarding
 - `POST /api/tag/{id}/callsign` - Set custom callsign for tag
 - `POST /api/tag/{id}/color` - Set custom color for tag
+
+## Auto-Start Features
+
+- **Service auto-start:** Service starts automatically on boot
+- **Browser auto-launch:** Dashboard opens automatically when service starts
+- **Desktop shortcut:** Easy one-click access to start dashboard
+- **Virtual environment:** Clean dependency management
 
 This dashboard is ideal for wall displays or quick status checks during operations. 
