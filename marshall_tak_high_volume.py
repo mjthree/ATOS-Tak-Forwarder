@@ -403,8 +403,14 @@ class OptimizedTAKClient:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)  # Larger send buffer
         
         # Create multicast socket once
-        self.multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self.multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        try:
+            print("🔧 Creating multicast socket...")
+            self.multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            self.multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+            print("✅ Multicast socket created successfully")
+        except Exception as e:
+            print(f"❌ Failed to create multicast socket: {e}")
+            self.multicast_sock = None
 
     def create_cot_message(self, tag_id: str, tag_data: Dict[str, Any], callsign: str) -> Optional[bytes]:
         try:
@@ -443,12 +449,15 @@ class OptimizedTAKClient:
                     self.sock.sendto(cot_message, (host, port))
                     
                     # Send to multicast (UDP 6969)
-                    try:
-                        print(f"🔍 Attempting multicast send to 224.0.0.1:{multicast_port} for tag {tag_id}")
-                        self.multicast_sock.sendto(cot_message, ('224.0.0.1', multicast_port))
-                        print(f"✅ Multicast send successful for tag {tag_id}")
-                    except Exception as e:
-                        print(f"⚠️ Multicast send failed for tag {tag_id}: {e}")
+                    if self.multicast_sock is None:
+                        print(f"❌ Multicast socket not available for tag {tag_id}")
+                    else:
+                        try:
+                            print(f"🔍 Attempting multicast send to 224.0.0.1:{multicast_port} for tag {tag_id}")
+                            self.multicast_sock.sendto(cot_message, ('224.0.0.1', multicast_port))
+                            print(f"✅ Multicast send successful for tag {tag_id}")
+                        except Exception as e:
+                            print(f"⚠️ Multicast send failed for tag {tag_id}: {e}")
                     
                     sent_count += 1
                     log_tak_forward(tag_id, tag_data, tak_server_config, cot_message)
@@ -463,7 +472,8 @@ class OptimizedTAKClient:
     def close(self):
         """Close the multicast socket"""
         try:
-            self.multicast_sock.close()
+            if self.multicast_sock is not None:
+                self.multicast_sock.close()
         except:
             pass
 
