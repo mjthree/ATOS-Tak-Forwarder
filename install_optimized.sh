@@ -20,7 +20,7 @@ SERVICE_NAME="atos-tracker"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 INSTALL_DIR="/opt/atos-tak-forwarder"
 VENV_DIR="${INSTALL_DIR}/venv"
-BACKUP_DIR="${INSTALL_DIR}/backup"
+BACKUP_DIR="/opt/atos-tak-forwarder-backup"
 LOG_DIR="/var/log/atos-tak-forwarder"
 CONFIG_DIR="/etc/atos-tak-forwarder"
 
