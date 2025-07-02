@@ -859,7 +859,7 @@ def serial_reader():
     while True:
         ser = None
         try:
-            print("Attempting to connect to /dev/ttyACM0...")
+            print("[DEBUG] Serial reader loop running, attempting to connect to /dev/ttyACM0...")
             ser = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1)
             ser.setDTR(True)
             ser.setRTS(True)
@@ -873,9 +873,11 @@ def serial_reader():
                 try:
                     if ser.in_waiting > 0:
                         data = ser.read(ser.in_waiting)
+                        print(f"[DEBUG] Received {len(data)} bytes from serial port")
                         buffer += data
                         packets, buffer = extract_packets_from_buffer(buffer)
                         for packet in packets:
+                            print(f"[DEBUG] Parsed packet of length {len(packet)}")
                             stats['total_packets'] += 1
                             stats['last_update'] = datetime.now().strftime('%H:%M:%S')
                             if len(packet) >= 20:
@@ -885,10 +887,10 @@ def serial_reader():
                                     with TAG_DATA_LOCK:
                                         old_data = tag_data.get(tag_id)
                                         tag_data[tag_id] = result
-                                    
-                                    # Add to optimized queue for TAK forwarding
-                                    print(f"[DEBUG] Adding tag {tag_id} to optimized queue")
-                                    optimized_queue.add_tag(tag_id, result, priority=1)
+                                        print(f"[DEBUG] Updated tag_data for tag {tag_id}")
+                                        # Add to optimized queue for TAK forwarding
+                                        print(f"[DEBUG] Adding tag {tag_id} to optimized queue")
+                                        optimized_queue.add_tag(tag_id, result, priority=1)
                                     log_tag_update(result)
                                     log_voltage_tracking(tag_id, result['battery_voltage'], datetime.now().isoformat())
                                     log_tag_status_change(tag_id, old_data, result)
@@ -1020,26 +1022,9 @@ def tak_sender_worker():
 
 @app.route('/api/tags')
 def api_tags():
-    result = {}
+    print("[DEBUG] /api/tags called, returning tag_data:", tag_data)
     with TAG_DATA_LOCK:
-        tag_data_snapshot = tag_data.copy()
-    for i in range(1, 101):
-        tag_id = str(i)
-        tag_key = int(tag_id)
-        if tag_key in tag_data_snapshot:
-            t = tag_data_snapshot[tag_key].copy()
-            t['stale'] = get_tag_staleness(t)
-        else:
-            t = {'stale': True, 'bad_gps': True}
-        cfg = forwarding_config['tags'].get(tag_id, {})
-        t['forward'] = cfg.get('forward', forwarding_config.get('forward_all', False))
-        callsign = cfg.get('callsign')
-        if not callsign:
-            callsign = tag_id
-        t['callsign'] = callsign
-        t['color'] = cfg.get('color', 'white')
-        result[tag_id] = t
-    return jsonify(result)
+        return jsonify({tid: dict(data) for tid, data in tag_data.items()})
 
 @app.route('/api/stats')
 def api_stats():
