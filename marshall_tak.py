@@ -70,12 +70,16 @@ def save_forwarding_config(cfg):
 
 def load_tak_config():
     if not os.path.exists(TAK_SERVER_CONFIG_FILE):
-        cfg = {'ip': '192.168.200.11', 'port': 8087}
+        cfg = {'ip': '192.168.200.11', 'port': 8087, 'send_interval': 10}
         with open(TAK_SERVER_CONFIG_FILE, 'w') as f:
             json.dump(cfg, f, indent=2)
         return cfg
     with open(TAK_SERVER_CONFIG_FILE, 'r') as f:
-        return json.load(f)
+        cfg = json.load(f)
+    if 'send_interval' not in cfg:
+        cfg['send_interval'] = 10
+        save_tak_config(cfg)
+    return cfg
 
 def save_tak_config(cfg):
     with open(TAK_SERVER_CONFIG_FILE, 'w') as f:
@@ -493,6 +497,22 @@ class AtosTAKClient:
                 self.sock.sendto(cot_message, (host, port))
                 print(f"✅ Sent COT for Tag {tag_id}: {tag_to_send.get('latitude', 0):.6f}°, {tag_to_send.get('longitude', 0):.6f}°, {tag_to_send.get('battery_voltage', 0)}V")
 
+
+def tak_sender_loop():
+    """Periodically send all non-stale tag data to the TAK server."""
+    global tak_client, tag_data, forwarding_config, tak_server_config
+    while True:
+        try:
+            tak_client.send_updates_for_changed_tags(tag_data, forwarding_config, tak_server_config)
+        except Exception as e:
+            print(f"Error in periodic TAK send: {e}")
+        interval = tak_server_config.get('send_interval', 10)
+        try:
+            interval = float(interval)
+        except (TypeError, ValueError):
+            interval = 10
+        time.sleep(max(1, interval))
+
 # ==== API endpoints for web controls ====
 
 @app.route('/api/tags')
@@ -524,6 +544,11 @@ def api_tak_server():
     data = request.get_json(force=True)
     tak_server_config['ip'] = data.get('ip', tak_server_config.get('ip'))
     tak_server_config['port'] = int(data.get('port', tak_server_config.get('port')))
+    if 'send_interval' in data:
+        try:
+            tak_server_config['send_interval'] = int(data.get('send_interval'))
+        except (TypeError, ValueError):
+            pass
     save_tak_config(tak_server_config)
     return jsonify({'status': 'ok'})
 
@@ -677,6 +702,8 @@ def main():
     tak_client = AtosTAKClient()
     serial_thread = threading.Thread(target=serial_reader, daemon=True)
     serial_thread.start()
+    tak_send_thread = threading.Thread(target=tak_sender_loop, daemon=True)
+    tak_send_thread.start()
     time.sleep(2)
     print("🌐 Opening web interface...")
     webbrowser.open('http://localhost:5000')

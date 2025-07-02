@@ -19,6 +19,15 @@
     <h1>🚀 ATOS Forwarder</h1>
     <div>
         TAK Server: <input id="tak-ip" size="15"> : <input id="tak-port" size="5">
+        Interval:
+        <select id="send-interval">
+            <option value="2">2s</option>
+            <option value="5">5s</option>
+            <option value="10">10s</option>
+            <option value="15">15s</option>
+            <option value="30">30s</option>
+            <option value="60">60s</option>
+        </select>
         <button onclick="updateTak()">Update</button>
         <button id="forward-all">Forward All</button>
     </div>
@@ -103,11 +112,20 @@ function updateTable(tags){
 }
 function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);}
 function fetchConfigs(){
-  fetch('/api/tak_server').then(r=>r.json()).then(d=>{document.getElementById('tak-ip').value=d.ip;document.getElementById('tak-port').value=d.port;});
+  fetch('/api/tak_server').then(r=>r.json()).then(d=>{document.getElementById('tak-ip').value=d.ip;document.getElementById('tak-port').value=d.port;document.getElementById('send-interval').value=d.send_interval||10;});
   fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
   fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
 }
-function updateTak(){const ip=document.getElementById('tak-ip').value;const port=document.getElementById('tak-port').value;fetch('/api/tak_server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip,port})});}
+function updateTak(){
+  const ip=document.getElementById('tak-ip').value;
+  const port=document.getElementById('tak-port').value;
+  const send_interval=document.getElementById('send-interval').value;
+  fetch('/api/tak_server',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ip,port,send_interval})
+  });
+}
  document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
 function saveTemplate(){const name=document.getElementById('template-name').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',name})}).then(fetchConfigs);}
 function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
