@@ -545,6 +545,7 @@ class AtosTAKClient:
 def tak_sender_loop():
     """Periodically send all non-stale tag data to the TAK server."""
     global tak_client, tag_data, forwarding_config, tak_server_config
+    next_time = time.time()
     while True:
         try:
             tak_client.send_updates_for_changed_tags(tag_data, forwarding_config, tak_server_config)
@@ -555,7 +556,9 @@ def tak_sender_loop():
             interval = float(interval)
         except (TypeError, ValueError):
             interval = 10
-        time.sleep(max(1, interval))
+        next_time += interval
+        sleep_time = max(0, next_time - time.time())
+        time.sleep(sleep_time)
 
 # ==== API endpoints for web controls ====
 
