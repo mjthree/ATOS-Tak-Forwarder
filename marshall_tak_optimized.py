@@ -467,9 +467,12 @@ class HighVolumeTAKProcessor:
             # Get adaptive batch size
             batch_size = self.adaptive_batcher.calculate_optimal_batch_size()
             pending = self.optimized_queue.get_pending_tags(max_tags=batch_size)
+            print(f"[DEBUG] Pending tags for forwarding: {list(pending.keys())}")
             
             if pending:
                 await self._process_optimized_batch(pending)
+            else:
+                print("[DEBUG] No tags pending for forwarding in this batch.")
             
             # Record timing
             processing_time = time.time() - start_time
@@ -483,7 +486,7 @@ class HighVolumeTAKProcessor:
     
     async def _process_optimized_batch(self, pending):
         """Process batch with all optimizations"""
-        
+        print(f"[DEBUG] Processing batch: {list(pending.keys())}")
         batch_messages = []
         log_entries = []
         
@@ -494,6 +497,7 @@ class HighVolumeTAKProcessor:
             
             # Fast COT generation
             cot_message = self.cot_pool.create_cot_message_fast(str(tag_id), tag, callsign)
+            print(f"[DEBUG] Prepared COT message for tag {tag_id}")
             batch_messages.append(cot_message)
             
             # Prepare log entry
@@ -509,7 +513,9 @@ class HighVolumeTAKProcessor:
             })
         
         # Send using connection pool
+        print(f"[DEBUG] Sending batch of {len(batch_messages)} messages to TAK server {tak_server_config['ip']}:{tak_server_config['port']}")
         successful, total = await self.tak_pool.send_batch_parallel(batch_messages)
+        print(f"[DEBUG] Sent {successful}/{total} messages in batch.")
         
         # Buffered logging
         for i, entry in enumerate(log_entries):
@@ -520,8 +526,7 @@ class HighVolumeTAKProcessor:
                     tak_server_config, 
                     batch_messages[i]
                 )
-        
-        print(f"📡 Sent {successful}/{total} tags in optimized batch (batch_size: {len(pending)})")
+
 # ==== Logging helpers ====
 
 def log_tag_update(tag_data_entry):
