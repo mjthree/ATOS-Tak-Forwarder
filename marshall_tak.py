@@ -19,6 +19,7 @@ from pathlib import Path
 import signal
 import sys
 import socket
+import queue
 from typing import Dict, Any, Optional
 
 app = Flask(__name__)
@@ -29,6 +30,7 @@ app = Flask(__name__)
 tag_data = {}
 TAG_DATA_LOCK = threading.Lock()
 packet_history = []
+send_queue = queue.Queue()
 stats = {
     'total_packets': 0,
     'last_update': None,
@@ -238,6 +240,31 @@ def log_tak_config_update():
         print(f"Error logging TAK config update: {e}")
 
 
+
+def enqueue_tag_for_sending(tag):
+    """Add a parsed tag update to the sending queue."""
+    try:
+        send_queue.put_nowait(tag)
+    except queue.Full:
+        print("⚠️  Send queue is full, dropping update")
+
+
+def send_tag_via_tak(tag):
+    """Send a single tag update to the TAK server respecting forwarding settings."""
+    tag_id = tag.get('tag_id')
+    cfg = forwarding_config['tags'].get(str(tag_id), {})
+    should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
+    if not should_forward:
+        return
+    tag_to_send = tag.copy()
+    tag_to_send['color'] = cfg.get('color', 'white')
+    callsign = cfg.get('callsign') or str(tag_id)
+    cot_message = tak_client.create_cot_message(str(tag_id), tag_to_send, callsign)
+    if cot_message:
+        host = tak_server_config.get('ip', '127.0.0.1')
+        port = tak_server_config.get('port', 0)
+        tak_client.sock.sendto(cot_message, (host, port))
+        log_tak_forward(tag_id, tag_to_send, tak_server_config, cot_message)
 
 def is_bad_gps(lat, lon, alt, is_fresh):
     if not is_fresh:
@@ -453,6 +480,7 @@ def serial_reader():
                                     if len(packet_history) > 50:
                                         packet_history.pop(0)
                                     export_json()
+                                    enqueue_tag_for_sending(result)
                             elif len(packet) >= 3:
                                 result = parse_fiftysix_packet(packet)
                                 if result:
@@ -460,7 +488,7 @@ def serial_reader():
                                     if len(packet_history) > 50:
                                         packet_history.pop(0)
                                     export_json()
-                        # Actual TAK forwarding occurs in tak_sender_loop
+                        # Actual TAK forwarding occurs in tak_sender_worker
                     time.sleep(0.01)
                 except serial.SerialException as e:
                     print(f"Serial communication error: {e}")
@@ -544,23 +572,22 @@ class AtosTAKClient:
                 log_tak_forward(tag_id, tag_to_send, tak_server_config, cot_message)
 
 
-def tak_sender_loop():
-    """Periodically send all non-stale tag data to the TAK server."""
-    global tak_client, tag_data, forwarding_config, tak_server_config
-    next_time = time.time()
+def tak_sender_worker():
+    """Send queued tag updates to the TAK server as they arrive."""
+    global tak_client
     while True:
+        tag = send_queue.get()
         try:
-            tak_client.send_updates_for_changed_tags(tag_data, forwarding_config, tak_server_config)
+            send_tag_via_tak(tag)
         except Exception as e:
-            print(f"Error in periodic TAK send: {e}")
-        interval = tak_server_config.get('send_interval', 10)
+            print(f"Error sending tag {tag.get('tag_id')}: {e}")
+        interval = tak_server_config.get('send_interval', 1)
         try:
             interval = float(interval)
         except (TypeError, ValueError):
-            interval = 10
-        next_time += interval
-        sleep_time = max(0, next_time - time.time())
-        time.sleep(sleep_time)
+            interval = 1
+        time.sleep(max(0, interval))
+        send_queue.task_done()
 
 # ==== API endpoints for web controls ====
 
@@ -755,7 +782,7 @@ def main():
     tak_client = AtosTAKClient()
     serial_thread = threading.Thread(target=serial_reader, daemon=True)
     serial_thread.start()
-    tak_send_thread = threading.Thread(target=tak_sender_loop, daemon=True)
+    tak_send_thread = threading.Thread(target=tak_sender_worker, daemon=True)
     tak_send_thread.start()
     time.sleep(2)
     print("🌐 Opening web interface...")
