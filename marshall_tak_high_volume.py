@@ -444,7 +444,9 @@ class OptimizedTAKClient:
                     
                     # Send to multicast (UDP 6969)
                     try:
+                        print(f"🔍 Attempting multicast send to 224.0.0.1:{multicast_port} for tag {tag_id}")
                         self.multicast_sock.sendto(cot_message, ('224.0.0.1', multicast_port))
+                        print(f"✅ Multicast send successful for tag {tag_id}")
                     except Exception as e:
                         print(f"⚠️ Multicast send failed for tag {tag_id}: {e}")
                     
