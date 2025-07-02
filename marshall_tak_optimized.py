@@ -30,7 +30,7 @@ app = Flask(__name__)
 
 # ==== Global Configuration ====
 UNKNOWN_COORD = 9999999.0
-JSON_EXPORT_PATH = 'latest_tag_data.json'
+JSON_EXPORT_PATH = './latest_tag_data.json'
 STALE_SECONDS = 60
 MAX_QUEUE_SIZE = 2000
 BATCH_SIZE = 100
@@ -812,19 +812,22 @@ def get_tag_staleness(tag, threshold_seconds=STALE_SECONDS):
 
 
 def export_json_with_stale():
-    export_data = {
-        'tags': {},
-        'stats': stats,
-        'history': packet_history[-10:]
-    }
-    with TAG_DATA_LOCK:
-        tag_items = list(tag_data.items())
-    for tag_id, tag in tag_items:
-        tag_copy = tag.copy()
-        tag_copy['stale'] = get_tag_staleness(tag_copy)
-        export_data['tags'][tag_id] = tag_copy
-    with open(JSON_EXPORT_PATH, 'w') as f:
-        json.dump(export_data, f, indent=2)
+    try:
+        export_data = {
+            'tags': {},
+            'stats': stats,
+            'history': packet_history[-10:]
+        }
+        with TAG_DATA_LOCK:
+            tag_items = list(tag_data.items())
+        for tag_id, tag in tag_items:
+            tag_copy = tag.copy()
+            tag_copy['stale'] = get_tag_staleness(tag_copy)
+            export_data['tags'][tag_id] = tag_copy
+        with open(JSON_EXPORT_PATH, 'w') as f:
+            json.dump(export_data, f, indent=2)
+    except Exception as e:
+        print(f"[WARNING] Could not write {JSON_EXPORT_PATH}: {e}")
 
 export_json = export_json_with_stale
 
@@ -854,6 +857,7 @@ def display():
 # ==== Serial reader thread ====
 
 def serial_reader():
+    print("[DEBUG] serial_reader() thread started")
     global tag_data, packet_history, stats, tak_client
     initialize_log_files()
     while True:
@@ -909,42 +913,18 @@ def serial_reader():
                                     export_json()
                         # Actual TAK forwarding occurs in tak_sender_worker
                     time.sleep(0.01)
-                except serial.SerialException as e:
-                    print(f"Serial communication error: {e}")
-                    break
                 except Exception as e:
-                    print(f"Error in serial read loop: {e}")
-                    break
-        except serial.SerialException as e:
-            error_msg = f"Serial connection error: {e}"
-            print(f"❌ {error_msg}")
-            stats['connected'] = False
-            stats['error'] = error_msg
-        except PermissionError as e:
-            error_msg = f"Permission error accessing /dev/ttyACM0: {e}"
-            print(f"❌ {error_msg}")
-            print("💡 This usually means the port is in use or the device disconnected")
-            stats['connected'] = False
-            stats['error'] = error_msg
+                    print(f"[DEBUG] Exception in serial read loop: {e}")
         except Exception as e:
-            error_msg = f"Unexpected error: {e}"
-            print(f"❌ {error_msg}")
+            print(f"[DEBUG] Exception opening serial port: {e}")
             stats['connected'] = False
-            stats['error'] = error_msg
-        finally:
-            if ser and ser.is_open:
-                try:
-                    ser.close()
-                    print("🔌 Serial port closed")
-                except Exception:
-                    pass
-        print("🔄 Waiting 10 seconds before retrying connection...")
-        time.sleep(10)
+            stats['error'] = str(e)
+            time.sleep(2)
 
 # ==== TAK client from atos_tak_client_udp ====
 class AtosTAKClient:
     def __init__(self):
-        self.json_file = "latest_tag_data.json"
+        self.json_file = "./latest_tag_data.json"
         self.last_sent_data: Dict[str, Any] = {}
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -1226,6 +1206,9 @@ async def main_async():
     await processor_task
 
 def main():
+    print("[DEBUG] main() starting, launching serial reader thread...")
+    serial_thread = threading.Thread(target=serial_reader, daemon=True)
+    serial_thread.start()
     try:
         asyncio.run(main_async())
     except KeyboardInterrupt:
