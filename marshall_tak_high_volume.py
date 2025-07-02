@@ -36,6 +36,10 @@ BATCH_SIZE = 50
 SERIAL_BUFFER_SIZE = 8192
 UDP_BATCH_INTERVAL = 0.5  # seconds
 
+# Rate limiting per tag (like ATOS plugin)
+TAG_RATE_LIMIT = 1.0  # 1 second between updates per tag
+tag_last_processed = {}  # Track when each tag was last processed
+
 # Global data storage
 tag_data = {}
 tags_pending_send = {}
@@ -48,7 +52,9 @@ stats = {
     'error': None,
     'packets_per_second': 0,
     'udp_sends': 0,
-    'batch_sends': 0
+    'batch_sends': 0,
+    'rate_limited_packets': 0,  # Track how many packets are rate limited
+    'active_tags': 0  # Track how many tags are currently active
 }
 
 # High-volume queues
@@ -422,6 +428,7 @@ class OptimizedTAKClient:
             try:
                 cot_message = self.create_cot_message(str(tag_id), tag_data, callsign)
                 if cot_message:
+                    print(cot_message.decode('utf-8', errors='replace'))  # Print COT XML before sending
                     self.sock.sendto(cot_message, (host, port))
                     sent_count += 1
                     log_tak_forward(tag_id, tag_data, tak_server_config, cot_message)
@@ -435,7 +442,7 @@ class OptimizedTAKClient:
 
 # ==== Optimized Worker Threads ====
 def packet_processor():
-    """Process packets from the queue"""
+    """Process packets from the queue with per-tag rate limiting"""
     while True:
         try:
             packet = packet_queue.get(timeout=1)
@@ -446,6 +453,19 @@ def packet_processor():
                 result = parse_fourty_packet(packet)
                 if result:
                     tag_id = result['tag_id']
+                    current_time = time.time()
+                    
+                    # Check rate limiting per tag (like ATOS plugin)
+                    last_processed = tag_last_processed.get(tag_id, 0)
+                    if current_time - last_processed < TAG_RATE_LIMIT:
+                        # Skip this packet - too soon since last update for this tag
+                        stats['rate_limited_packets'] += 1
+                        print(f"⏱️ Rate limiting tag {tag_id} - skipping packet (last update was {current_time - last_processed:.2f}s ago)")
+                        continue
+                    
+                    # Update last processed time for this tag
+                    tag_last_processed[tag_id] = current_time
+                    
                     with TAG_DATA_LOCK:
                         old_data = tag_data.get(tag_id)
                         tag_data[tag_id] = result
@@ -628,10 +648,18 @@ def api_tags():
 
 @app.route('/api/stats')
 def api_stats():
+    # Update active tags count
+    stats['active_tags'] = len(tag_last_processed)
+    
     return jsonify({
         'stats': stats,
         'queue_size': packet_queue.qsize(),
-        'pending_tags': len(tags_pending_send)
+        'pending_tags': len(tags_pending_send),
+        'rate_limiting': {
+            'tag_rate_limit_seconds': TAG_RATE_LIMIT,
+            'active_tags': len(tag_last_processed),
+            'rate_limited_packets': stats.get('rate_limited_packets', 0)
+        }
     })
 
 @app.route('/api/tak_server', methods=['GET', 'POST'])
