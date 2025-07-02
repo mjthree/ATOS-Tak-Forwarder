@@ -26,16 +26,25 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# Check if pip3 is installed
-if ! command -v pip3 &> /dev/null; then
-    echo "❌ pip3 is not installed. Please install pip3 first."
-    exit 1
+# Check if python3-venv is installed
+if ! python3 -c "import venv" &> /dev/null; then
+    echo "📦 Installing python3-venv..."
+    apt install -y python3-venv python3-full
 fi
 
-# Install Python dependencies
-echo "📦 Installing Python dependencies..."
+# Create virtual environment if it doesn't exist
+if [ ! -d "$SCRIPT_DIR/venv" ]; then
+    echo "🐍 Creating virtual environment..."
+    cd "$SCRIPT_DIR"
+    python3 -m venv venv
+fi
+
+# Install Python dependencies in virtual environment
+echo "📦 Installing Python dependencies in virtual environment..."
 cd "$SCRIPT_DIR"
-pip3 install -r requirements.txt
+source venv/bin/activate
+pip install -r requirements.txt
+deactivate
 
 # Copy service file to systemd directory
 echo "🔧 Installing systemd service..."

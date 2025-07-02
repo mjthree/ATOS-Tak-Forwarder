@@ -9,7 +9,7 @@ User=pi
 Group=pi
 WorkingDirectory=/home/pi/atos-newest
 Environment=PYTHONPATH=/home/pi/atos-newest
-ExecStart=/usr/bin/python3 /home/pi/atos-newest/marshall_tak.py
+ExecStart=/home/pi/atos-newest/venv/bin/python /home/pi/atos-newest/marshall_tak.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
