@@ -200,7 +200,6 @@ See `GIT_SETUP.md` for detailed Git workflow and best practices.
   `send_interval` to control how often tag data is forwarded. The interval
   can be adjusted on the web dashboard via a drop-down menu (2–60 seconds).
   A background thread forwards all active tags using this schedule.
-
 - `templates.json` - Saved configuration templates
 
 ## Logging

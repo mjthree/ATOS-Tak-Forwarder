@@ -237,6 +237,8 @@ def log_tak_config_update():
     except Exception as e:
         print(f"Error logging TAK config update: {e}")
 
+
+
 def is_bad_gps(lat, lon, alt, is_fresh):
     if not is_fresh:
         return True
