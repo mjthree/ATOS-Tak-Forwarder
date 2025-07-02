@@ -92,7 +92,7 @@ def save_forwarding_config(cfg):
 
 def load_tak_config():
     if not os.path.exists(TAK_SERVER_CONFIG_FILE):
-        cfg = {'ip': '192.168.200.11', 'port': 8087, 'send_interval': 10}
+        cfg = {'ip': '192.168.200.11', 'port': 8087, 'send_interval': 10, 'multicast_port': 6969}
         with open(TAK_SERVER_CONFIG_FILE, 'w') as f:
             json.dump(cfg, f, indent=2)
         return cfg
@@ -100,6 +100,9 @@ def load_tak_config():
         cfg = json.load(f)
     if 'send_interval' not in cfg:
         cfg['send_interval'] = 10
+        save_tak_config(cfg)
+    if 'multicast_port' not in cfg:
+        cfg['multicast_port'] = 6969
         save_tak_config(cfg)
     return cfg
 
@@ -402,6 +405,7 @@ class OptimizedTAKClient:
     def create_cot_message(self, tag_id: str, tag_data: Dict[str, Any], callsign: str) -> Optional[bytes]:
         try:
             color = tag_data.get('color', 'white').capitalize().replace('_', ' ')
+            track_type = tag_data.get('track_type', 'PAX')  # Default to PAX if not specified
             lat = f"{tag_data.get('latitude', 0):.7f}"
             lon = f"{tag_data.get('longitude', 0):.7f}"
             hae = f"{tag_data.get('altitude', 0):.3f}"
@@ -409,19 +413,20 @@ class OptimizedTAKClient:
             temp = f"{tag_data.get('temperature', 0):.0f}"
             now = datetime.now(timezone.utc)
             time_str = now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-            cot_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<event version="2.0" uid="atos-{tag_id}-60eabd39-32ed-436f-9a17-4a8add4d24fc" type="a-f-G-U-C-I" time="{time_str}" start="{time_str}" stale="{(now.replace(microsecond=0) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')}" how="m-g" access="Undefined"><point lat="{lat}" lon="{lon}" hae="{hae}" ce="1.3" le="2.0"/><detail><track vspeed="0.0" course="270.0" slope="0.0" speed="0.2777777777777778"/><link uid="ANDROID-3e844b3d264f49fb" type="a-f-G-U-C-I" parent_callsign="ATOS Forwarder" relation="p-p"/><contact callsign="{callsign}"/><__atos color="{color}" tag_type="Personnel" manifest="Course " alarm="0" temp_c="{temp}" voltage="{battery}"><attributes PAX_Type="" Team_Frequency="" Special_Equipment="" Frequency="" Remark=""/></__atos><archive/></detail></event>'''
+            cot_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<event version="2.0" uid="atos-{tag_id}-60eabd39-32ed-436f-9a17-4a8add4d24fc" type="a-f-G-U-C-I" time="{time_str}" start="{time_str}" stale="{(now.replace(microsecond=0) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')}" how="m-g" access="Undefined"><point lat="{lat}" lon="{lon}" hae="{hae}" ce="1.3" le="2.0"/><detail><track vspeed="0.0" course="270.0" slope="0.0" speed="0.2777777777777778"/><link uid="ANDROID-3e844b3d264f49fb" type="a-f-G-U-C-I" parent_callsign="ATOS Forwarder" relation="p-p"/><contact callsign="{callsign}"/><__atos color="{color}" tag_type="{track_type}" manifest="Course " alarm="0" temp_c="{temp}" voltage="{battery}"><attributes PAX_Type="" Team_Frequency="" Special_Equipment="" Frequency="" Remark=""/></__atos><archive/></detail></event>'''
             return cot_xml.encode('utf-8')
         except Exception as e:
             print(f"❌ Error creating COT message for tag {tag_id}: {e}")
             return None
 
     def send_batch(self, batch_messages):
-        """Send a batch of COT messages efficiently"""
+        """Send a batch of COT messages efficiently to both TAK server and multicast"""
         if not batch_messages:
             return
         
         host = tak_server_config.get('ip', '127.0.0.1')
         port = tak_server_config.get('port', 0)
+        multicast_port = tak_server_config.get('multicast_port', 6969)
         
         sent_count = 0
         for tag_id, tag_data, callsign in batch_messages:
@@ -429,7 +434,19 @@ class OptimizedTAKClient:
                 cot_message = self.create_cot_message(str(tag_id), tag_data, callsign)
                 if cot_message:
                     print(cot_message.decode('utf-8', errors='replace'))  # Print COT XML before sending
+                    
+                    # Send to TAK server
                     self.sock.sendto(cot_message, (host, port))
+                    
+                    # Send to multicast (UDP 6969)
+                    try:
+                        multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+                        multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+                        multicast_sock.sendto(cot_message, ('224.0.0.1', multicast_port))
+                        multicast_sock.close()
+                    except Exception as e:
+                        print(f"⚠️ Multicast send failed for tag {tag_id}: {e}")
+                    
                     sent_count += 1
                     log_tak_forward(tag_id, tag_data, tak_server_config, cot_message)
             except Exception as e:
@@ -438,7 +455,7 @@ class OptimizedTAKClient:
         stats['udp_sends'] += sent_count
         stats['batch_sends'] += 1
         if sent_count > 0:
-            print(f"📤 Sent batch of {sent_count} messages to {host}:{port}")
+            print(f"📤 Sent batch of {sent_count} messages to {host}:{port} and multicast {multicast_port}")
 
 # ==== Optimized Worker Threads ====
 def packet_processor():
@@ -520,6 +537,7 @@ def udp_batch_sender():
                     
                 tag_to_send = tag.copy()
                 tag_to_send['color'] = cfg.get('color', 'white')
+                tag_to_send['track_type'] = cfg.get('track_type', 'PAX')
                 callsign = cfg.get('callsign') or str(tag_id)
                 
                 batch_messages.append((tag_id, tag_to_send, callsign))
@@ -643,6 +661,7 @@ def api_tags():
             callsign = tag_id
         t['callsign'] = callsign
         t['color'] = cfg.get('color', 'white')
+        t['track_type'] = cfg.get('track_type', 'PAX')
         result[tag_id] = t
     return jsonify(result)
 
@@ -670,6 +689,11 @@ def api_tak_server():
     data = request.get_json(force=True)
     tak_server_config['ip'] = data.get('ip', tak_server_config.get('ip'))
     tak_server_config['port'] = int(data.get('port', tak_server_config.get('port')))
+    if 'multicast_port' in data:
+        try:
+            tak_server_config['multicast_port'] = int(data.get('multicast_port'))
+        except (TypeError, ValueError):
+            pass
     if 'send_interval' in data:
         try:
             tak_server_config['send_interval'] = int(data.get('send_interval'))
@@ -713,6 +737,14 @@ def api_tag_color(tag_id):
     global forwarding_config
     data = request.get_json(force=True)
     forwarding_config['tags'].setdefault(tag_id, {})['color'] = data.get('color', 'white')
+    save_forwarding_config(forwarding_config)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/tag/<tag_id>/track_type', methods=['POST'])
+def api_tag_track_type(tag_id):
+    global forwarding_config
+    data = request.get_json(force=True)
+    forwarding_config['tags'].setdefault(tag_id, {})['track_type'] = data.get('track_type', 'PAX')
     save_forwarding_config(forwarding_config)
     return jsonify({'status': 'ok'})
 

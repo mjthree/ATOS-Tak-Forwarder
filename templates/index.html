@@ -19,6 +19,7 @@
     <h1>🚀 ATOS Forwarder</h1>
     <div>
         TAK Server: <input id="tak-ip" size="15"> : <input id="tak-port" size="5">
+        Multicast Port: <input id="multicast-port" size="5" placeholder="6969">
         Interval:
         <select id="send-interval">
             <option value="2">2s</option>
@@ -36,7 +37,7 @@
     <table class="tag-table">
         <thead>
             <tr>
-                <th>Tag</th><th>Status</th><th>GPS</th><th>Lat</th><th>Lon</th><th>Alt(ft)</th><th>Battery</th><th>Last Update</th><th>Forward</th><th>Color</th><th>Callsign</th>
+                <th>Tag</th><th>Status</th><th>GPS</th><th>Lat</th><th>Lon</th><th>Alt(ft)</th><th>Battery</th><th>Last Update</th><th>Forward</th><th>Color</th><th>Track Type</th><th>Callsign</th>
             </tr>
         </thead>
         <tbody id="tag-table-body"></tbody>
@@ -58,6 +59,9 @@ let isEditing=false;
 const colorOptions = [
   'white','yellow','orange','magenta','red','maroon','purple','blue','cyan','teal','green','dark_green'
 ];
+const trackTypeOptions = [
+  'PAX','K9','VEHICLE','EQUIPMENT','MEDICAL','WEAPON','CUSTOM','BUNDLE','BOAT','FIXED_WING','ROTARY_WING','UAS'
+];
 function createColorDropdown(selectedColor, id) {
   const sel = document.createElement('select');
   colorOptions.forEach(color => {
@@ -72,6 +76,24 @@ function createColorDropdown(selectedColor, id) {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({color: sel.value})
+    });
+  };
+  return sel;
+}
+function createTrackTypeDropdown(selectedTrackType, id) {
+  const sel = document.createElement('select');
+  trackTypeOptions.forEach(trackType => {
+    const opt = document.createElement('option');
+    opt.value = trackType;
+    opt.text = trackType.replace('_',' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (trackType === selectedTrackType) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.onchange = () => {
+    fetch(`/api/tag/${id}/track_type`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({track_type: sel.value})
     });
   };
   return sel;
@@ -95,6 +117,9 @@ function updateTable(tags){
     const colorTd = document.createElement('td');
     colorTd.appendChild(createColorDropdown(tag.color||'white', id));
     tr.appendChild(colorTd);
+    const trackTypeTd = document.createElement('td');
+    trackTypeTd.appendChild(createTrackTypeDropdown(tag.track_type||'PAX', id));
+    tr.appendChild(trackTypeTd);
     const c=document.createElement('td');
     const inp=document.createElement('input');
     inp.value=tag.callsign||`Tag${id}`;
@@ -112,18 +137,19 @@ function updateTable(tags){
 }
 function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);}
 function fetchConfigs(){
-  fetch('/api/tak_server').then(r=>r.json()).then(d=>{document.getElementById('tak-ip').value=d.ip;document.getElementById('tak-port').value=d.port;document.getElementById('send-interval').value=d.send_interval||10;});
+  fetch('/api/tak_server').then(r=>r.json()).then(d=>{document.getElementById('tak-ip').value=d.ip;document.getElementById('tak-port').value=d.port;document.getElementById('multicast-port').value=d.multicast_port||6969;document.getElementById('send-interval').value=d.send_interval||10;});
   fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
   fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
 }
 function updateTak(){
   const ip=document.getElementById('tak-ip').value;
   const port=document.getElementById('tak-port').value;
+  const multicast_port=document.getElementById('multicast-port').value;
   const send_interval=document.getElementById('send-interval').value;
   fetch('/api/tak_server',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ip,port,send_interval})
+    body:JSON.stringify({ip,port,multicast_port,send_interval})
   });
 }
  document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
