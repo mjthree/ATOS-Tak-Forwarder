@@ -40,6 +40,7 @@ stats = {
 
 UNKNOWN_COORD = 9999999.0
 JSON_EXPORT_PATH = 'latest_tag_data.json'
+STALE_SECONDS = 60
 
 # Create logging directories
 LOGS_DIR = Path("comprehensive_logs")
@@ -370,7 +371,7 @@ def parse_fiftysix_packet(pkt):
         print(f"Error parsing FIFTYSIX packet: {e}")
         return None
 
-def get_tag_staleness(tag, threshold_seconds=15):
+def get_tag_staleness(tag, threshold_seconds=STALE_SECONDS):
     """Return True if tag data is older than threshold_seconds."""
     try:
         if 'timestamp_epoch' in tag:
@@ -464,6 +465,7 @@ def serial_reader():
                                     with TAG_DATA_LOCK:
                                         old_data = tag_data.get(tag_id)
                                         tag_data[tag_id] = result
+                                        print(f"[QUEUE] Tag {tag_id} added to pending queue at {result['timestamp']}")
                                         # Track this tag for sending in the next TAK interval
                                         tags_pending_send[tag_id] = result.copy()
                                     log_tag_update(result)
@@ -578,6 +580,7 @@ def tak_sender_worker():
 
         for tag_id, tag in pending.items():
             if get_tag_staleness(tag):
+                print(f"[SKIP] Tag {tag_id} skipped as stale at {datetime.now()}")
                 continue
             try:
                 send_tag_via_tak(tag)
