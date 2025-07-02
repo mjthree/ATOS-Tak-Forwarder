@@ -235,8 +235,7 @@ create_venv() {
         pip install flask pyserial
     fi
     
-    # Install additional optimization dependencies
-    pip install asyncio concurrent-futures
+    # Note: asyncio and concurrent.futures are built into Python 3
     
     print_status "Virtual environment created and dependencies installed"
 }
