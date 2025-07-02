@@ -571,8 +571,10 @@ def tak_sender_worker():
     global tak_client
     while True:
         with TAG_DATA_LOCK:
-            pending = {tid: data.copy() for tid, data in tags_pending_send.items()}
+            pending = tags_pending_send.copy()
             tags_pending_send.clear()
+
+        print(f"[DEBUG] Sending {len(pending)} tags to TAK server at {time.strftime('%H:%M:%S')}")
 
         for tag_id, tag in pending.items():
             if get_tag_staleness(tag):
