@@ -40,21 +40,25 @@ chmod +x marshall_tak_high_volume.py
 
 # Install Python dependencies
 echo "🐍 Installing Python dependencies..."
-echo "   Checking for pip3..."
-if command -v pip3 &> /dev/null; then
-    echo "   Found pip3, installing dependencies..."
-    pip3 install -r requirements.txt
-elif python3 -c "import pip" &> /dev/null; then
-    echo "   Found python3 -m pip, installing dependencies..."
-    python3 -m pip install -r requirements.txt
+echo "   Checking for system packages first..."
+
+# Try to install via apt first (preferred for system packages)
+if apt list --installed | grep -q "python3-flask" && apt list --installed | grep -q "python3-serial"; then
+    echo "   System packages already installed"
+elif apt install -y python3-flask python3-serial python3-werkzeug 2>/dev/null; then
+    echo "   Installed via system packages"
 else
-    echo "⚠️ pip not found, installing pip first..."
-    echo "   Updating package list..."
-    apt update
-    echo "   Installing python3-pip..."
-    apt install -y python3-pip
-    echo "   Installing dependencies with pip3..."
-    pip3 install -r requirements.txt
+    echo "   System packages not available, trying pip with --break-system-packages..."
+    if command -v pip3 &> /dev/null; then
+        pip3 install --break-system-packages -r requirements.txt
+    elif python3 -c "import pip" &> /dev/null; then
+        python3 -m pip install --break-system-packages -r requirements.txt
+    else
+        echo "⚠️ pip not found, installing pip first..."
+        apt update
+        apt install -y python3-pip
+        pip3 install --break-system-packages -r requirements.txt
+    fi
 fi
 
 # Create simple systemd service
