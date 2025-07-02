@@ -531,6 +531,7 @@ def packet_processor():
 
 def udp_batch_sender():
     """Send batched UDP messages"""
+    print("🚀 UDP batch sender thread started")
     tak_client = OptimizedTAKClient()
     
     while True:
