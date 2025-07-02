@@ -783,7 +783,7 @@ def api_tag_color(tag_id):
 def api_tag_track_type(tag_id):
     global forwarding_config
     data = request.get_json(force=True)
-            forwarding_config['tags'].setdefault(tag_id, {})['track_type'] = data.get('track_type', 'PAX')
+    forwarding_config['tags'].setdefault(tag_id, {})['track_type'] = data.get('track_type', 'PAX')
     save_forwarding_config(forwarding_config)
     return jsonify({'status': 'ok'})
 
