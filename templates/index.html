@@ -60,7 +60,7 @@ const colorOptions = [
   'white','yellow','orange','magenta','red','maroon','purple','blue','cyan','teal','green','dark_green'
 ];
 const trackTypeOptions = [
-  'PAX','K9','VEHICLE','EQUIPMENT','MEDICAL','WEAPON','CUSTOM','BUNDLE','BOAT','FIXED_WING','ROTARY_WING','UAS'
+  'Pax','K9','VEHICLE','EQUIPMENT','MEDICAL','WEAPON','CUSTOM','BUNDLE','BOAT','FIXED_WING','ROTARY_WING','UAS'
 ];
 function createColorDropdown(selectedColor, id) {
   const sel = document.createElement('select');
@@ -118,7 +118,7 @@ function updateTable(tags){
     colorTd.appendChild(createColorDropdown(tag.color||'white', id));
     tr.appendChild(colorTd);
     const trackTypeTd = document.createElement('td');
-    trackTypeTd.appendChild(createTrackTypeDropdown(tag.track_type||'PAX', id));
+            trackTypeTd.appendChild(createTrackTypeDropdown(tag.track_type||'Pax', id));
     tr.appendChild(trackTypeTd);
     const c=document.createElement('td');
     const inp=document.createElement('input');

@@ -5,67 +5,67 @@
       "forward": true,
       "color": "white",
       "callsign": "1",
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "4": {
       "forward": true,
       "color": "white",
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "2": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "6": {
       "forward": true,
       "color": "white",
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "3": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "5": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "7": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "8": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "9": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "10": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "11": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "13": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     },
     "14": {
       "color": "white",
       "forward": true,
-      "track_type": "PAX"
+      "track_type": "Pax"
     }
   }
 }

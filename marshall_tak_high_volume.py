@@ -415,9 +415,9 @@ class OptimizedTAKClient:
     def create_cot_message(self, tag_id: str, tag_data: Dict[str, Any], callsign: str) -> Optional[bytes]:
         try:
             color = tag_data.get('color', 'white').capitalize().replace('_', ' ')
-            track_type = tag_data.get('track_type', 'PAX')
+            track_type = tag_data.get('track_type', 'Pax')
             tag_type_map = {
-                'PAX': 'PAX',
+                'PAX': 'Pax',
                 'K9': 'K9',
                 'VEHICLE': 'Vehicle',
                 'EQUIPMENT': 'Equipment',
@@ -574,9 +574,11 @@ def udp_batch_sender():
                     
                 tag_to_send = tag.copy()
                 tag_to_send['color'] = cfg.get('color', 'white')
-                tag_to_send['track_type'] = cfg.get('track_type', 'PAX')
-                callsign = cfg.get('callsign') or str(tag_id)
-                
+                tag_to_send['track_type'] = cfg.get('track_type', 'Pax')
+                callsign = cfg.get('callsign')
+                if not callsign:
+                    callsign = tag_id
+                tag_to_send['callsign'] = callsign
                 batch_messages.append((tag_id, tag_to_send, callsign))
                 
                 if len(batch_messages) >= BATCH_SIZE:
@@ -698,7 +700,7 @@ def api_tags():
             callsign = tag_id
         t['callsign'] = callsign
         t['color'] = cfg.get('color', 'white')
-        t['track_type'] = cfg.get('track_type', 'PAX')
+        t['track_type'] = cfg.get('track_type', 'Pax')
         result[tag_id] = t
     return jsonify(result)
 
@@ -781,7 +783,7 @@ def api_tag_color(tag_id):
 def api_tag_track_type(tag_id):
     global forwarding_config
     data = request.get_json(force=True)
-    forwarding_config['tags'].setdefault(tag_id, {})['track_type'] = data.get('track_type', 'PAX')
+    forwarding_config['tags'].setdefault(tag_id, {})['track_type'] = data.get('track_type', 'Pax')
     save_forwarding_config(forwarding_config)
     return jsonify({'status': 'ok'})
 
