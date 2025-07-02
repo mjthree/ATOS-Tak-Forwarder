@@ -28,6 +28,7 @@ app = Flask(__name__)
 
 # Global data storage
 tag_data = {}
+TAG_DATA_LOCK = threading.Lock()
 packet_history = []
 stats = {
     'total_packets': 0,
@@ -205,7 +206,7 @@ def initialize_log_files():
         print(f"Error initializing log files: {e}")
 
 
-def log_tak_forward(tag_id, tag, tak_cfg):
+def log_tak_forward(tag_id, tag, tak_cfg, cot_message: bytes):
     """Log each COT message sent to the TAK server with timestamp and config."""
     try:
         with open(TAK_FORWARD_LOG_FILE, 'a') as f:
@@ -217,7 +218,8 @@ def log_tak_forward(tag_id, tag, tak_cfg):
                 'send_interval': tak_cfg.get('send_interval'),
                 'latitude': tag.get('latitude'),
                 'longitude': tag.get('longitude'),
-                'battery_voltage': tag.get('battery_voltage')
+                'battery_voltage': tag.get('battery_voltage'),
+                'cot_xml': cot_message.decode('utf-8', errors='replace')
             }
             f.write(json.dumps(entry) + '\n')
     except Exception as e:
@@ -373,7 +375,9 @@ def export_json_with_stale():
         'stats': stats,
         'history': packet_history[-10:]
     }
-    for tag_id, tag in tag_data.items():
+    with TAG_DATA_LOCK:
+        tag_items = list(tag_data.items())
+    for tag_id, tag in tag_items:
         tag_copy = tag.copy()
         tag_copy['stale'] = get_tag_staleness(tag_copy)
         export_data['tags'][tag_id] = tag_copy
@@ -385,7 +389,9 @@ export_json = export_json_with_stale
 @app.route('/api/data')
 def get_data():
     tags_with_stale = {}
-    for tag_id, tag in tag_data.items():
+    with TAG_DATA_LOCK:
+        tag_items = list(tag_data.items())
+    for tag_id, tag in tag_items:
         tag_copy = tag.copy()
         tag_copy['stale'] = get_tag_staleness(tag_copy)
         tags_with_stale[tag_id] = tag_copy
@@ -434,8 +440,9 @@ def serial_reader():
                                 result = parse_fourty_packet(packet)
                                 if result:
                                     tag_id = result['tag_id']
-                                    old_data = tag_data.get(tag_id)
-                                    tag_data[tag_id] = result
+                                    with TAG_DATA_LOCK:
+                                        old_data = tag_data.get(tag_id)
+                                        tag_data[tag_id] = result
                                     log_tag_update(result)
                                     log_voltage_tracking(tag_id, result['battery_voltage'], datetime.now().isoformat())
                                     log_tag_status_change(tag_id, old_data, result)
@@ -510,7 +517,9 @@ class AtosTAKClient:
             return None
 
     def send_updates_for_changed_tags(self, tags: Dict[int, Any], forwarding_config, tak_server_config):
-        for tag_id, tag in tags.items():
+        with TAG_DATA_LOCK:
+            tag_items = list(tags.items())
+        for tag_id, tag in tag_items:
             if tag.get('stale', False):
                 continue
             cfg = forwarding_config['tags'].get(str(tag_id), {})
@@ -528,9 +537,10 @@ class AtosTAKClient:
                 host = tak_server_config.get('ip', '127.0.0.1')
                 port = tak_server_config.get('port', 0)
                 print(f"[DEBUG] Sending to {host}:{port} for Tag {tag_id}:")
+                print(cot_message.decode('utf-8', errors='replace'))
                 self.sock.sendto(cot_message, (host, port))
                 print(f"✅ Sent COT for Tag {tag_id}: {tag_to_send.get('latitude', 0):.6f}°, {tag_to_send.get('longitude', 0):.6f}°, {tag_to_send.get('battery_voltage', 0)}V")
-                log_tak_forward(tag_id, tag_to_send, tak_server_config)
+                log_tak_forward(tag_id, tag_to_send, tak_server_config, cot_message)
 
 
 def tak_sender_loop():
@@ -569,11 +579,13 @@ def tak_sender_loop():
 @app.route('/api/tags')
 def api_tags():
     result = {}
+    with TAG_DATA_LOCK:
+        tag_data_snapshot = tag_data.copy()
     for i in range(1, 101):
         tag_id = str(i)
         tag_key = int(tag_id)
-        if tag_key in tag_data:
-            t = tag_data[tag_key].copy()
+        if tag_key in tag_data_snapshot:
+            t = tag_data_snapshot[tag_key].copy()
             t['stale'] = get_tag_staleness(t)
         else:
             t = {'stale': True, 'bad_gps': True}
@@ -678,7 +690,8 @@ def api_reset_tags():
             del forwarding_config['tags'][tag_id]['callsign']
         forwarding_config['tags'][tag_id]['color'] = 'white'
     save_forwarding_config(forwarding_config)
-    tag_data.clear()
+    with TAG_DATA_LOCK:
+        tag_data.clear()
     return jsonify({'status': 'success'})
 
 # ==== Utility functions ====
