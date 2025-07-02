@@ -206,6 +206,7 @@ The application creates comprehensive logs in the `comprehensive_logs/` director
 - `voltage_tracking_*.csv` - Voltage readings per tag
 - `tag_status_*.jsonl` - Status changes (GPS, voltage thresholds)
 - `voltage_analysis_*.json` - Voltage threshold analysis
+- `tak_forwarding_*.log` - Every COT message sent to the TAK server
 
 ## API Endpoints
 

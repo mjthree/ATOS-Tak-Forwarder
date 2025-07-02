@@ -48,6 +48,7 @@ timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 COMPREHENSIVE_LOG_FILE = LOGS_DIR / f"all_tag_updates_{timestamp}.jsonl"
 VOLTAGE_LOG_FILE = LOGS_DIR / f"voltage_tracking_{timestamp}.csv"
 TAG_STATUS_LOG_FILE = LOGS_DIR / f"tag_status_{timestamp}.jsonl"
+TAK_FORWARD_LOG_FILE = LOGS_DIR / f"tak_forwarding_{timestamp}.log"
 
 # ==== Config management for new features ====
 FORWARDING_CONFIG_FILE = 'forwarding_config.json'
@@ -179,6 +180,9 @@ def initialize_log_files():
     try:
         with open(VOLTAGE_LOG_FILE, 'w') as f:
             f.write("timestamp,tag_id,voltage\n")
+        # Create TAK forwarding log file
+        with open(TAK_FORWARD_LOG_FILE, 'w') as f:
+            f.write("timestamp,tag_id,ip,port,send_interval,latitude,longitude,battery_voltage\n")
         summary_file = LOGS_DIR / f"logging_summary_{timestamp}.txt"
         with open(summary_file, 'w') as f:
             f.write(f"Comprehensive Tag Logging Started: {datetime.now()}\n")
@@ -186,6 +190,7 @@ def initialize_log_files():
             f.write(f"  - All updates: {COMPREHENSIVE_LOG_FILE}\n")
             f.write(f"  - Voltage tracking: {VOLTAGE_LOG_FILE}\n")
             f.write(f"  - Status changes: {TAG_STATUS_LOG_FILE}\n")
+            f.write(f"  - TAK forwarding: {TAK_FORWARD_LOG_FILE}\n")
             f.write(f"  - Summary: {summary_file}\n")
             f.write(f"\nPurpose: Overnight voltage threshold testing\n")
             f.write(f"Monitoring: All tag updates with timestamps\n")
@@ -195,8 +200,41 @@ def initialize_log_files():
         print(f"   📊 All updates: {COMPREHENSIVE_LOG_FILE}")
         print(f"   🔋 Voltage tracking: {VOLTAGE_LOG_FILE}")
         print(f"   📈 Status changes: {TAG_STATUS_LOG_FILE}")
+        print(f"   📤 TAK forwarding: {TAK_FORWARD_LOG_FILE}")
     except Exception as e:
         print(f"Error initializing log files: {e}")
+
+
+def log_tak_forward(tag_id, tag, tak_cfg):
+    """Log each COT message sent to the TAK server with timestamp and config."""
+    try:
+        with open(TAK_FORWARD_LOG_FILE, 'a') as f:
+            entry = {
+                'timestamp': datetime.now().isoformat(),
+                'tag_id': tag_id,
+                'ip': tak_cfg.get('ip'),
+                'port': tak_cfg.get('port'),
+                'send_interval': tak_cfg.get('send_interval'),
+                'latitude': tag.get('latitude'),
+                'longitude': tag.get('longitude'),
+                'battery_voltage': tag.get('battery_voltage')
+            }
+            f.write(json.dumps(entry) + '\n')
+    except Exception as e:
+        print(f"Error logging TAK forward: {e}")
+
+
+def log_tak_config_update():
+    """Log updates to TAK server configuration from the web interface."""
+    try:
+        with open(TAK_FORWARD_LOG_FILE, 'a') as f:
+            entry = {
+                'timestamp': datetime.now().isoformat(),
+                'config_update': tak_server_config
+            }
+            f.write(json.dumps(entry) + '\n')
+    except Exception as e:
+        print(f"Error logging TAK config update: {e}")
 
 def is_bad_gps(lat, lon, alt, is_fresh):
     if not is_fresh:
@@ -496,6 +534,23 @@ class AtosTAKClient:
                 print(f"[DEBUG] Sending to {host}:{port} for Tag {tag_id}:")
                 self.sock.sendto(cot_message, (host, port))
                 print(f"✅ Sent COT for Tag {tag_id}: {tag_to_send.get('latitude', 0):.6f}°, {tag_to_send.get('longitude', 0):.6f}°, {tag_to_send.get('battery_voltage', 0)}V")
+                log_tak_forward(tag_id, tag_to_send, tak_server_config)
+
+
+def tak_sender_loop():
+    """Periodically send all non-stale tag data to the TAK server."""
+    global tak_client, tag_data, forwarding_config, tak_server_config
+    while True:
+        try:
+            tak_client.send_updates_for_changed_tags(tag_data, forwarding_config, tak_server_config)
+        except Exception as e:
+            print(f"Error in periodic TAK send: {e}")
+        interval = tak_server_config.get('send_interval', 10)
+        try:
+            interval = float(interval)
+        except (TypeError, ValueError):
+            interval = 10
+        time.sleep(max(1, interval))
 
 
 def tak_sender_loop():
@@ -550,6 +605,7 @@ def api_tak_server():
         except (TypeError, ValueError):
             pass
     save_tak_config(tak_server_config)
+    log_tak_config_update()
     return jsonify({'status': 'ok'})
 
 @app.route('/api/forward_all', methods=['GET', 'POST'])
