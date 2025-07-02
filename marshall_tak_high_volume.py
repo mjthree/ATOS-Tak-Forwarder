@@ -859,8 +859,10 @@ def main():
     print("🚀 Starting High-Volume TAK Processor...")
     
     # Start packet processor thread
+    print("🔧 Creating packet processor thread...")
     packet_thread = threading.Thread(target=packet_processor, daemon=True)
     packet_thread.start()
+    print("✅ Packet processor thread created")
     
     # Start UDP batch sender thread
     print("🔧 Starting UDP batch sender thread...")
