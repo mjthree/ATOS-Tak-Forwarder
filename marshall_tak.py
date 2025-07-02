@@ -205,7 +205,7 @@ def initialize_log_files():
         print(f"Error initializing log files: {e}")
 
 
-def log_tak_forward(tag_id, tag, tak_cfg):
+def log_tak_forward(tag_id, tag, tak_cfg, cot_message: bytes):
     """Log each COT message sent to the TAK server with timestamp and config."""
     try:
         with open(TAK_FORWARD_LOG_FILE, 'a') as f:
@@ -217,7 +217,8 @@ def log_tak_forward(tag_id, tag, tak_cfg):
                 'send_interval': tak_cfg.get('send_interval'),
                 'latitude': tag.get('latitude'),
                 'longitude': tag.get('longitude'),
-                'battery_voltage': tag.get('battery_voltage')
+                'battery_voltage': tag.get('battery_voltage'),
+                'cot_xml': cot_message.decode('utf-8', errors='replace')
             }
             f.write(json.dumps(entry) + '\n')
     except Exception as e:
@@ -535,9 +536,10 @@ class AtosTAKClient:
                 host = tak_server_config.get('ip', '127.0.0.1')
                 port = tak_server_config.get('port', 0)
                 print(f"[DEBUG] Sending to {host}:{port} for Tag {tag_id}:")
+                print(cot_message.decode('utf-8', errors='replace'))
                 self.sock.sendto(cot_message, (host, port))
                 print(f"✅ Sent COT for Tag {tag_id}: {tag_to_send.get('latitude', 0):.6f}°, {tag_to_send.get('longitude', 0):.6f}°, {tag_to_send.get('battery_voltage', 0)}V")
-                log_tak_forward(tag_id, tag_to_send, tak_server_config)
+                log_tak_forward(tag_id, tag_to_send, tak_server_config, cot_message)
 
 
 def tak_sender_loop():
