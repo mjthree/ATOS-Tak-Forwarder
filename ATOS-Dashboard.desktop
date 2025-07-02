@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ATOS Dashboard
+Comment=Start ATOS Tracker Dashboard
+Exec=/home/pi/atos-newest/start_dashboard.sh
+Icon=applications-internet
+Terminal=true
+Categories=Network;WebBrowser; 

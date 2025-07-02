@@ -61,6 +61,13 @@ systemctl enable $SERVICE_NAME
 echo "🔐 Setting file permissions..."
 chown -R pi:pi "$SCRIPT_DIR"
 chmod +x "$SCRIPT_DIR/marshall_tak.py"
+chmod +x "$SCRIPT_DIR/start_dashboard.sh"
+
+# Set up desktop entry
+echo "🖥️ Setting up desktop entry..."
+cp "$SCRIPT_DIR/ATOS-Dashboard.desktop" /home/pi/Desktop/
+chown pi:pi /home/pi/Desktop/ATOS-Dashboard.desktop
+chmod +x /home/pi/Desktop/ATOS-Dashboard.desktop
 
 echo ""
 echo "🎉 Installation complete!"
@@ -71,6 +78,10 @@ echo "2. Start the service: sudo systemctl start atos-tracker"
 echo "3. Check status: sudo systemctl status atos-tracker"
 echo "4. View logs: sudo journalctl -u atos-tracker -f"
 echo "5. Access dashboard: http://[RASPBERRY_PI_IP]:5000/display"
+echo ""
+echo "🖥️ Desktop shortcuts:"
+echo "   - Double-click 'ATOS Dashboard' on desktop to start service and open browser"
+echo "   - Or run: ./start_dashboard.sh"
 echo ""
 echo "🔧 Service management commands:"
 echo "   Start:   sudo systemctl start atos-tracker"
