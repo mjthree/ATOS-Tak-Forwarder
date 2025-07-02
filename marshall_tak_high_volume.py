@@ -480,6 +480,7 @@ class OptimizedTAKClient:
 # ==== Optimized Worker Threads ====
 def packet_processor():
     """Process packets from the queue with per-tag rate limiting"""
+    print("🚀 Packet processor thread started")
     while True:
         try:
             packet = packet_queue.get(timeout=1)
@@ -862,8 +863,10 @@ def main():
     packet_thread.start()
     
     # Start UDP batch sender thread
+    print("🔧 Starting UDP batch sender thread...")
     udp_thread = threading.Thread(target=udp_batch_sender, daemon=True)
     udp_thread.start()
+    print("✅ UDP batch sender thread started")
     
     # Start serial reader thread
     serial_thread = threading.Thread(target=serial_reader, daemon=True)
