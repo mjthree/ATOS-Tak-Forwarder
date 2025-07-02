@@ -195,7 +195,8 @@ See `GIT_SETUP.md` for detailed Git workflow and best practices.
 
 - `marshall_tak.py` - Main application with serial port configuration
 - `forwarding_config.json` - TAK forwarding settings
-- `tak_server_config.json` - TAK server connection settings
+- `tak_server_config.json` - TAK server connection settings. Includes
+  `send_interval` to control how often tag data is forwarded.
 - `templates.json` - Saved configuration templates
 
 ## Logging
@@ -210,7 +211,8 @@ The application creates comprehensive logs in the `comprehensive_logs/` director
 
 - `GET /api/tags` - Returns current status of all 100 tags
 - `GET /api/data` - Returns packet history and statistics
-- `POST /api/tak_server` - Configure TAK server settings
+- `POST /api/tak_server` - Configure TAK server settings (IP, port, and
+  `send_interval`)
 - `POST /api/forward_all` - Enable/disable forwarding for all tags
 - `POST /api/tag/{id}/forward` - Configure individual tag forwarding
 - `POST /api/tag/{id}/callsign` - Set custom callsign for tag
