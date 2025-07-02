@@ -843,6 +843,7 @@ def signal_handler(sig, frame):
 # ==== Main function ====
 def main():
     print("🚀 High-Volume ATOS TAK Forwarder for 100+ Devices")
+    print("🔧 Version: Thread-based with multicast debugging")
     print("=" * 60)
     print("📊 Optimizations: Queue-based processing, UDP batching, efficient memory")
     print("🎯 Target: 100+ devices with high packet rates")
