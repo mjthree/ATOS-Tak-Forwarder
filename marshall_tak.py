@@ -27,6 +27,8 @@ app = Flask(__name__)
 
 # Global data storage
 tag_data = {}
+# Track tags that have received new data since the last TAK send interval
+tags_pending_send = {}
 TAG_DATA_LOCK = threading.Lock()
 packet_history = []
 stats = {
@@ -462,6 +464,8 @@ def serial_reader():
                                     with TAG_DATA_LOCK:
                                         old_data = tag_data.get(tag_id)
                                         tag_data[tag_id] = result
+                                        # Track this tag for sending in the next TAK interval
+                                        tags_pending_send[tag_id] = result.copy()
                                     log_tag_update(result)
                                     log_voltage_tracking(tag_id, result['battery_voltage'], datetime.now().isoformat())
                                     log_tag_status_change(tag_id, old_data, result)
@@ -563,15 +567,22 @@ class AtosTAKClient:
 
 
 def tak_sender_worker():
-    """Periodically forward all non-stale tags to the TAK server."""
+    """Periodically forward tags with new data to the TAK server."""
     global tak_client
     while True:
         with TAG_DATA_LOCK:
-            snapshot = {tid: data.copy() for tid, data in tag_data.items()}
-        try:
-            tak_client.send_updates_for_changed_tags(snapshot, forwarding_config, tak_server_config)
-        except Exception as e:
-            print(f"Error sending tag updates: {e}")
+            pending = {tid: data.copy() for tid, data in tags_pending_send.items()}
+            tags_pending_send.clear()
+
+        for tag_id, tag in pending.items():
+            if get_tag_staleness(tag):
+                continue
+            try:
+                send_tag_via_tak(tag)
+                print(f"[DEBUG] Sent tag {tag_id} at {tag.get('timestamp')}")
+            except Exception as e:
+                print(f"Error sending tag {tag_id}: {e}")
+
         interval = tak_server_config.get('send_interval', 1)
         try:
             interval = float(interval)
