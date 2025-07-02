@@ -415,7 +415,22 @@ class OptimizedTAKClient:
     def create_cot_message(self, tag_id: str, tag_data: Dict[str, Any], callsign: str) -> Optional[bytes]:
         try:
             color = tag_data.get('color', 'white').capitalize().replace('_', ' ')
-            track_type = tag_data.get('track_type', 'PAX')  # Default to PAX if not specified
+            track_type = tag_data.get('track_type', 'PAX')
+            tag_type_map = {
+                'PAX': 'PAX',
+                'K9': 'K9',
+                'VEHICLE': 'Vehicle',
+                'EQUIPMENT': 'Equipment',
+                'MEDICAL': 'Medical',
+                'WEAPON': 'Weapon',
+                'CUSTOM': 'Custom',
+                'BUNDLE': 'Bundle',
+                'BOAT': 'Boat',
+                'FIXED_WING': 'Fixed_Wing',
+                'ROTARY_WING': 'Rotary_Wing',
+                'UAS': 'UAS',
+            }
+            tag_type_xml = tag_type_map.get(track_type.upper(), 'PAX')
             lat = f"{tag_data.get('latitude', 0):.7f}"
             lon = f"{tag_data.get('longitude', 0):.7f}"
             hae = f"{tag_data.get('altitude', 0):.3f}"
@@ -423,7 +438,7 @@ class OptimizedTAKClient:
             temp = f"{tag_data.get('temperature', 0):.0f}"
             now = datetime.now(timezone.utc)
             time_str = now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-            cot_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<event version="2.0" uid="atos-{tag_id}-60eabd39-32ed-436f-9a17-4a8add4d24fc" type="a-f-G-U-C-I" time="{time_str}" start="{time_str}" stale="{(now.replace(microsecond=0) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')}" how="m-g" access="Undefined"><point lat="{lat}" lon="{lon}" hae="{hae}" ce="1.3" le="2.0"/><detail><track vspeed="0.0" course="270.0" slope="0.0" speed="0.2777777777777778"/><link uid="ANDROID-3e844b3d264f49fb" type="a-f-G-U-C-I" parent_callsign="ATOS Forwarder" relation="p-p"/><contact callsign="{callsign}"/><__atos color="{color}" tag_type="{track_type}" manifest="Course " alarm="0" temp_c="{temp}" voltage="{battery}"><attributes PAX_Type="" Team_Frequency="" Special_Equipment="" Frequency="" Remark=""/></__atos><archive/></detail></event>'''
+            cot_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<event version="2.0" uid="atos-{tag_id}-60eabd39-32ed-436f-9a17-4a8add4d24fc" type="a-f-G-U-C-I" time="{time_str}" start="{time_str}" stale="{(now.replace(microsecond=0) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')}" how="m-g" access="Undefined"><point lat="{lat}" lon="{lon}" hae="{hae}" ce="1.3" le="2.0"/><detail><track vspeed="0.0" course="270.0" slope="0.0" speed="0.2777777777777778"/><link uid="ANDROID-3e844b3d264f49fb" type="a-f-G-U-C-I" parent_callsign="ATOS Forwarder" relation="p-p"/><contact callsign="{callsign}"/><__atos color="{color}" tag_type="{tag_type_xml}" manifest="Course " alarm="0" temp_c="{temp}" voltage="{battery}"><attributes PAX_Type="" Team_Frequency="" Special_Equipment="" Frequency="" Remark=""/></__atos><archive/></detail></event>'''
             return cot_xml.encode('utf-8')
         except Exception as e:
             print(f"❌ Error creating COT message for tag {tag_id}: {e}")
