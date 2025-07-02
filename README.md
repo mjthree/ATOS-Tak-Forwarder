@@ -1,263 +1,451 @@
-# ATOS Tracker Display Dashboard
+# ATOS TAK Forwarder - High-Volume Tracker System
 
-A large-screen dashboard for monitoring up to 100 ATOS trackers in real time.
+A comprehensive system for forwarding ATOS tracker data to TAK servers with real-time web dashboard monitoring. Designed to handle 100+ devices with optimized performance, multicast support, and advanced rate limiting.
 
-## Features
+## 🚀 Features
 
-- **Real-time Monitoring:** Live tracking of up to 100 ATOS tags
-- **Web Dashboard:** Clean 10x10 grid display optimized for wall-mounted screens
-- **Color-coded Status:** Visual indicators for tag health and battery status
-- **Comprehensive Logging:** Detailed logging of all tag updates and voltage data
-- **TAK Integration:** Forward tag data to TAK servers
-- **Service Mode:** Runs as a systemd service on Raspberry Pi
-- **Auto-browser Launch:** Automatically opens dashboard on service start
-- **Virtual Environment:** Uses Python virtual environment for clean dependency management
+### Core Functionality
+- **High-Volume Processing:** Optimized for 100+ ATOS trackers simultaneously
+- **TAK Server Integration:** Forwards COT messages to TAK servers via UDP/TCP
+- **Multicast Support:** Broadcasts to UDP 6969 for ATAK compatibility
+- **Real-time Web Dashboard:** Live monitoring with 10x10 grid display
+- **Queue-based Processing:** Efficient packet handling with threading
+- **Rate Limiting:** Per-tag rate limiting to prevent spam (like ATOS plugin)
+- **Service Mode:** Runs as systemd service on Raspberry Pi
 
-## Dashboard Display
+### Web Interface
+- **Main Dashboard:** `http://[PI_IP]:5000/display` - Clean 10x10 grid for wall mounting
+- **Control Interface:** `http://[PI_IP]:5000/` - Full configuration and monitoring
+- **API Endpoints:** RESTful API for programmatic access
+- **Real-time Updates:** Auto-refreshing data every 2 seconds
 
-- **Access:** Go to `http://[RASPBERRY_PI_IP]:5000/display` while the service is running
-- **Layout:** 10x10 grid, each box shows the tracker number only
-- **Color logic:**
-  - **Green:** Tag is not stale and battery voltage is 3.50V or higher
-  - **Yellow:** Tag is not stale and battery voltage is below 3.50V (or missing)
-  - **Red:** Tag is stale (regardless of voltage)
-- **Updates:** Dashboard refreshes every 2 seconds with live data from `/api/tags`
-- **No title:** The dashboard is designed for clean, full-screen display with no header
+### Track Type Support
+- **PAX** → Personnel (person icon in ATAK)
+- **K9** → K9 (dog icon in ATAK)
+- **VEHICLE** → Vehicle (vehicle icon in ATAK)
+- **EQUIPMENT** → Equipment (equipment icon in ATAK)
+- **MEDICAL** → Medical (medical icon in ATAK)
+- **WEAPON** → Weapon (weapon icon in ATAK)
+- **BOAT** → Boat (boat icon in ATAK)
+- **UAS** → UAS (drone icon in ATAK)
+- **FIXED_WING** → Fixed_Wing (airplane icon in ATAK)
+- **ROTARY_WING** → Rotary_Wing (helicopter icon in ATAK)
+- **CUSTOM** → Custom (custom icon in ATAK)
+- **BUNDLE** → Bundle (bundle icon in ATAK)
 
-## Raspberry Pi Setup
+### Color-Coded Status System
+- **🟢 Green:** Tag active + battery ≥ 3.50V
+- **🟡 Yellow:** Tag active + battery < 3.50V (or missing)
+- **🔴 Red:** Tag stale (no recent updates)
+- **⚫ Gray:** Tag not detected
 
-### Prerequisites
+## 📋 Prerequisites
 
-1. **Raspberry Pi OS** (Raspbian) with Python 3.7+ installed
-2. **Serial connection** to your ATOS receiver (USB-to-Serial adapter)
-3. **Network access** for web dashboard
-4. **Git** installed on Raspberry Pi
-5. **Desktop environment** (for auto-browser launch)
+### Hardware Requirements
+- **Raspberry Pi** (3B+ or 4 recommended for 100+ devices)
+- **USB-to-Serial adapter** for ATOS receiver connection
+- **Network connection** for TAK server communication
+- **Display** (optional, for local dashboard viewing)
 
-### Installation Steps
+### Software Requirements
+- **Raspberry Pi OS** (Raspbian) with Python 3.7+
+- **Git** for repository management
+- **Desktop environment** (for auto-browser launch)
+- **TAK Server** (for receiving forwarded data)
 
-#### Option A: Automated Installation (Recommended)
+## 🛠️ Installation
 
-1. **Install Git on Raspberry Pi:**
-   ```bash
-   sudo apt update
-   sudo apt install git
-   ```
-
-2. **Clone the repository:**
-   ```bash
-   cd /home/pi
-   git clone https://github.com/mjthree/ATOS-Tak-Forwarder.git atos-newest
-   cd atos-newest
-   ```
-
-3. **Run the automated installer:**
-   ```bash
-   chmod +x install_service.sh
-   sudo ./install_service.sh
-   ```
-
-   The installer will:
-   - ✅ Install required Python packages (`python3-venv`, `python3-full`)
-   - ✅ Create a Python virtual environment
-   - ✅ Install Python dependencies (Flask, pyserial, Werkzeug)
-   - ✅ Set up the systemd service
-   - ✅ Create desktop shortcut for easy access
-   - ✅ Configure proper permissions
-
-4. **Configure your serial port:**
-   - Edit `marshall_tak.py` and change `COM4` to your Raspberry Pi's serial port
-   - Common ports: `/dev/ttyUSB0`, `/dev/ttyACM0`, or `/dev/ttyAMA0`
-   - Find your port: `ls /dev/tty*`
-
-5. **Start the service:**
-   ```bash
-   sudo systemctl start atos-tracker
-   sudo systemctl enable atos-tracker
-   ```
-
-6. **Access the dashboard:**
-   - The browser will automatically open to the dashboard
-   - Or manually go to: `http://[RASPBERRY_PI_IP]:5000/display`
-
-#### Option B: Manual Installation
-
-1. **Install dependencies:**
-   ```bash
-   sudo apt install python3-venv python3-full
-   ```
-
-2. **Create virtual environment:**
-   ```bash
-   cd /home/pi/atos-newest
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   deactivate
-   ```
-
-3. **Set up service manually:**
-   ```bash
-   sudo cp atos-tracker.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable atos-tracker
-   ```
-
-### Service Management
-
+### Step 1: System Preparation
 ```bash
-# Start the service (auto-opens browser)
-sudo systemctl start atos-tracker
+# Update system
+sudo apt update && sudo apt upgrade -y
 
-# Stop the service
-sudo systemctl stop atos-tracker
+# Install required packages
+sudo apt install git python3-venv python3-full python3-pip -y
 
-# Restart the service (auto-opens browser)
-sudo systemctl restart atos-tracker
-
-# Check service status
-sudo systemctl status atos-tracker
-
-# View live logs
-sudo journalctl -u atos-tracker -f
-
-# Enable auto-start on boot
-sudo systemctl enable atos-tracker
-
-# Disable auto-start on boot
-sudo systemctl disable atos-tracker
+# Add user to dialout group for serial access
+sudo usermod -a -G dialout pi
 ```
 
-### Desktop Shortcuts
+### Step 2: Repository Setup
+```bash
+# Clone repository
+cd /home/pi
+git clone https://github.com/mjthree/ATOS-Tak-Forwarder.git
+cd ATOS-Tak-Forwarder
 
-After installation, you'll have:
-- **ATOS Dashboard** desktop shortcut - Double-click to start service and open browser
-- **Manual startup script** - Run `./start_dashboard.sh` to start service and open browser
+# Pull latest changes
+git pull origin main
+```
 
-### Accessing the Dashboard
+### Step 3: High-Volume Service Installation
+```bash
+# Run the high-volume installer
+chmod +x install_high_volume.sh
+sudo ./install_high_volume.sh
+```
 
-- **Auto-launch:** Browser opens automatically when service starts
-- **Manual access:** `http://[RASPBERRY_PI_IP]:5000/display`
-- **Control Interface:** `http://[RASPBERRY_PI_IP]:5000/`
-- **API Endpoint:** `http://[RASPBERRY_PI_IP]:5000/api/tags`
+The installer will:
+- ✅ Create Python virtual environment
+- ✅ Install all dependencies (Flask, pyserial, Werkzeug)
+- ✅ Set up systemd service (`atos-high-volume.service`)
+- ✅ Configure proper permissions
+- ✅ Create service directory at `/opt/atos-tak-forwarder-high-volume/`
 
-### Finding Your Raspberry Pi's IP Address
+### Step 4: Configuration
 
+#### Serial Port Configuration
+```bash
+# Find your serial port
+ls /dev/tty*
+
+# Common ports:
+# /dev/ttyUSB0  - USB-to-Serial adapter
+# /dev/ttyACM0  - Arduino-style device
+# /dev/ttyAMA0  - Hardware serial (Pi 3 and earlier)
+```
+
+The script automatically uses `/dev/ttyACM0`. If different, edit the service file:
+```bash
+sudo nano /etc/systemd/system/atos-high-volume.service
+```
+
+#### TAK Server Configuration
+Edit the TAK server settings in the web interface or modify `tak_server_config.json`:
+```json
+{
+  "ip": "192.168.1.100",
+  "port": 8087,
+  "multicast_port": 6969,
+  "send_interval": 2
+}
+```
+
+### Step 5: Service Management
+```bash
+# Start the service
+sudo systemctl start atos-high-volume.service
+
+# Enable auto-start on boot
+sudo systemctl enable atos-high-volume.service
+
+# Check status
+sudo systemctl status atos-high-volume.service
+
+# View logs
+sudo journalctl -u atos-high-volume.service -f
+```
+
+## 🌐 Web Interface Access
+
+### Dashboard URLs
+- **Main Control:** `http://[PI_IP]:5000/`
+- **Display Dashboard:** `http://[PI_IP]:5000/display`
+- **API Endpoint:** `http://[PI_IP]:5000/api/tags`
+
+### Finding Your Pi's IP
 ```bash
 hostname -I
 ```
 
-### Troubleshooting
+### Dashboard Features
+- **Real-time Tag Monitoring:** Live updates every 2 seconds
+- **Individual Tag Control:** Enable/disable forwarding per tag
+- **Track Type Selection:** Choose appropriate icon for ATAK
+- **Color Configuration:** Customize tag colors
+- **Callsign Management:** Set friendly names for tags
+- **Template System:** Save and load configurations
+- **Statistics:** Performance metrics and packet counts
 
-1. **Service won't start:**
-   ```bash
-   sudo journalctl -u atos-tracker -n 50
-   ```
+## 🔧 Configuration
 
-2. **Browser doesn't open:**
-   - Check if desktop environment is running: `ps aux | grep -E "(xfce|gnome|kde|lxde|mate)"`
-   - Ensure DISPLAY is set: `export DISPLAY=:0`
-   - Check if Chromium is installed: `which chromium-browser`
-
-3. **Serial port issues:**
-   - Check if your USB device is recognized: `lsusb`
-   - Check available serial ports: `ls /dev/tty*`
-   - Ensure user has serial port access: `sudo usermod -a -G dialout pi`
-
-4. **Virtual environment issues:**
-   - Recreate virtual environment: `rm -rf venv && python3 -m venv venv`
-   - Reinstall dependencies: `source venv/bin/activate && pip install -r requirements.txt`
-
-5. **Firewall issues:**
-   ```bash
-   sudo ufw status
-   sudo ufw allow 5000
-   ```
-
-6. **Permission issues:**
-   ```bash
-   sudo chown -R pi:pi /home/pi/atos-newest
-   chmod +x /home/pi/atos-newest/marshall_tak.py
-   ```
-
-## Development Setup (Windows/Linux)
-
-For development and testing on your local machine:
-
-1. **Clone the repository (if not already done):**
-   ```bash
-   git clone https://github.com/mjthree/ATOS-Tak-Forwarder.git
-   cd ATOS-Tak-Forwarder
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Run the application:**
-   ```bash
-   python marshall_tak.py
-   ```
-
-4. **Access the dashboard:**
-   - Go to `http://localhost:5000/display`
-
-## Git Workflow
-
-### Updating the Application
-
-**From your development machine:**
-```bash
-git add .
-git commit -m "Description of your changes"
-git push
+### Forwarding Configuration (`forwarding_config.json`)
+```json
+{
+  "forward_all": true,
+  "tags": {
+    "1": {
+      "forward": true,
+      "color": "white",
+      "callsign": "Alpha-1",
+      "track_type": "PAX"
+    }
+  }
+}
 ```
 
-**On Raspberry Pi:**
-```bash
-cd /home/pi/atos-newest
-git pull
-sudo systemctl restart atos-tracker
+### TAK Server Configuration (`tak_server_config.json`)
+```json
+{
+  "ip": "192.168.1.100",
+  "port": 8087,
+  "multicast_port": 6969,
+  "send_interval": 2
+}
 ```
 
-See `GIT_SETUP.md` for detailed Git workflow and best practices.
+### Performance Settings
+- **TAG_RATE_LIMIT:** 2 seconds (minimum time between updates per tag)
+- **UDP_BATCH_INTERVAL:** 2 seconds (how often to send batches)
+- **BATCH_SIZE:** 10 (maximum tags per UDP batch)
+- **STALE_SECONDS:** 30 seconds (when to mark tag as stale)
 
-## Configuration Files
+## 📊 Monitoring and Logs
 
-- `marshall_tak.py` - Main application with serial port configuration
-- `forwarding_config.json` - TAK forwarding settings
-- `tak_server_config.json` - TAK server connection settings. Includes
-  `send_interval` which controls how often all valid tags are forwarded to the
-  TAK server as a batch. The value can be adjusted on the web dashboard
-  (2–60 seconds).
-- `templates.json` - Saved configuration templates
+### Log Files
+- **Tag Updates:** `comprehensive_logs/tag_updates.log`
+- **Voltage Tracking:** `comprehensive_logs/voltage_tracking.log`
+- **Status Changes:** `comprehensive_logs/status_changes.log`
+- **TAK Forwarding:** `comprehensive_logs/tak_forwarding.log`
 
-## Logging
+### Viewing Logs
+```bash
+# Real-time tag updates
+tail -f comprehensive_logs/tag_updates.log
 
-The application creates comprehensive logs in the `comprehensive_logs/` directory:
-- `all_tag_updates_*.jsonl` - All tag updates with timestamps
-- `voltage_tracking_*.csv` - Voltage readings per tag
-- `tag_status_*.jsonl` - Status changes (GPS, voltage thresholds)
-- `voltage_analysis_*.json` - Voltage threshold analysis
-- `tak_forwarding_*.log` - Every COT message sent to the TAK server with the full XML payload
+# Battery voltage tracking
+tail -f comprehensive_logs/voltage_tracking.log
 
-## API Endpoints
+# TAK forwarding activity
+tail -f comprehensive_logs/tak_forwarding.log
+```
 
-- `GET /api/tags` - Returns current status of all 100 tags
-- `GET /api/data` - Returns packet history and statistics
-- `POST /api/tak_server` - Configure TAK server settings (IP, port, and
-  `send_interval`). The interval controls how often all valid tags are forwarded.
-- `POST /api/forward_all` - Enable/disable forwarding for all tags
-- `POST /api/tag/{id}/forward` - Configure individual tag forwarding
-- `POST /api/tag/{id}/callsign` - Set custom callsign for tag
-- `POST /api/tag/{id}/color` - Set custom color for tag
+### Service Logs
+```bash
+# View service logs
+sudo journalctl -u atos-high-volume.service -f
 
-## Auto-Start Features
+# View last 50 log entries
+sudo journalctl -u atos-high-volume.service -n 50
+```
 
-- **Service auto-start:** Service starts automatically on boot
-- **Browser auto-launch:** Dashboard opens automatically when service starts
-- **Desktop shortcut:** Easy one-click access to start dashboard
-- **Virtual environment:** Clean dependency management
+## 🔄 Updates and Maintenance
 
-This dashboard is ideal for wall displays or quick status checks during operations. 
+### Updating the Forwarder
+```bash
+# Stop the service
+sudo systemctl stop atos-high-volume.service
+
+# Pull latest changes
+git pull origin main
+
+# Copy updated files to service directory
+sudo cp marshall_tak_high_volume.py /opt/atos-tak-forwarder-high-volume/
+sudo cp templates/*.html /opt/atos-tak-forwarder-high-volume/templates/
+sudo cp forwarding_config.json /opt/atos-tak-forwarder-high-volume/
+
+# Restart the service
+sudo systemctl start atos-high-volume.service
+
+# Check status
+sudo systemctl status atos-high-volume.service
+```
+
+### Backup Configuration
+```bash
+# Backup current configuration
+cp forwarding_config.json forwarding_config_backup.json
+cp tak_server_config.json tak_server_config_backup.json
+```
+
+## 🚨 Troubleshooting
+
+### Service Won't Start
+```bash
+# Check service status
+sudo systemctl status atos-high-volume.service
+
+# View detailed logs
+sudo journalctl -u atos-high-volume.service -n 50
+
+# Check Python syntax
+python3 -m py_compile marshall_tak_high_volume.py
+```
+
+### Common Issues
+
+#### 1. Serial Port Access
+```bash
+# Check if user is in dialout group
+groups pi
+
+# Add to dialout group if needed
+sudo usermod -a -G dialout pi
+
+# Reboot or logout/login
+sudo reboot
+```
+
+#### 2. Port Already in Use
+```bash
+# Check what's using port 5000
+sudo netstat -tlnp | grep :5000
+
+# Kill process if needed
+sudo kill -9 [PID]
+```
+
+#### 3. Permission Issues
+```bash
+# Fix ownership
+sudo chown -R pi:pi /opt/atos-tak-forwarder-high-volume/
+
+# Fix permissions
+sudo chmod +x /opt/atos-tak-forwarder-high-volume/marshall_tak_high_volume.py
+```
+
+#### 4. Virtual Environment Issues
+```bash
+# Recreate virtual environment
+cd /opt/atos-tak-forwarder-high-volume/
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+deactivate
+```
+
+#### 5. Network/Firewall Issues
+```bash
+# Check firewall status
+sudo ufw status
+
+# Allow port 5000
+sudo ufw allow 5000
+
+# Check network connectivity
+ping 8.8.8.8
+```
+
+### Performance Issues
+
+#### High CPU Usage
+- Check number of active tags
+- Monitor packet queue size
+- Consider increasing rate limiting
+
+#### Memory Issues
+- Monitor memory usage: `free -h`
+- Check for memory leaks in logs
+- Restart service if needed
+
+#### Network Issues
+- Check TAK server connectivity
+- Verify multicast is working
+- Monitor UDP packet loss
+
+## 📡 TAK Integration
+
+### COT Message Format
+The forwarder sends standard CoT messages with custom ATOS extensions:
+```xml
+<event version="2.0" uid="atos-{tag_id}-60eabd39-32ed-436f-9a17-4a8add4d24fc" 
+       type="a-f-G-U-C-I" time="{timestamp}" start="{timestamp}" 
+       stale="{stale_time}" how="m-g" access="Undefined">
+  <point lat="{lat}" lon="{lon}" hae="{alt}" ce="1.3" le="2.0"/>
+  <detail>
+    <track vspeed="0.0" course="270.0" slope="0.0" speed="0.2777777777777778"/>
+    <link uid="ANDROID-3e844b3d264f49fb" type="a-f-G-U-C-I" 
+          parent_callsign="ATOS Forwarder" relation="p-p"/>
+    <contact callsign="{callsign}"/>
+    <__atos color="{color}" tag_type="{track_type}" manifest="Course " 
+            alarm="0" temp_c="{temp}" voltage="{battery}">
+      <attributes PAX_Type="" Team_Frequency="" Special_Equipment="" 
+                  Frequency="" Remark=""/>
+    </__atos>
+    <archive/>
+  </detail>
+</event>
+```
+
+### Multicast Support
+- **UDP 6969:** Standard ATAK multicast port
+- **Address:** 239.2.3.1 (standard TAK multicast)
+- **Automatic:** All COT messages sent to both TAK server and multicast
+
+### Rate Limiting
+- **Per-tag:** 2-second minimum between updates (configurable)
+- **Batch processing:** Efficient UDP batching
+- **Queue management:** Prevents memory overflow
+
+## 🎯 Advanced Features
+
+### Template System
+Save and load different configurations:
+- **Save:** Export current settings as template
+- **Load:** Apply saved template
+- **Delete:** Remove unused templates
+- **Rename:** Organize templates
+
+### API Endpoints
+- `GET /api/tags` - Get all tag data
+- `GET /api/stats` - Get system statistics
+- `POST /api/tag/{id}/forward` - Enable/disable tag forwarding
+- `POST /api/tag/{id}/callsign` - Set tag callsign
+- `POST /api/tag/{id}/color` - Set tag color
+- `POST /api/tag/{id}/track_type` - Set track type
+
+### Performance Monitoring
+- **Active tags:** Number of currently tracked tags
+- **Packet counts:** Total packets processed
+- **Rate limiting:** Number of packets rate-limited
+- **UDP sends:** Number of COT messages sent
+- **Queue size:** Current packet queue depth
+
+## 🔒 Security Considerations
+
+### Network Security
+- **Firewall:** Configure firewall rules appropriately
+- **VLAN:** Consider isolating ATOS network
+- **VPN:** Use VPN for remote access if needed
+
+### Access Control
+- **Local access:** Web interface accessible on local network
+- **Authentication:** Consider adding authentication for production use
+- **HTTPS:** Use reverse proxy for HTTPS in production
+
+## 📞 Support
+
+### Getting Help
+1. **Check logs:** Always check service logs first
+2. **Verify configuration:** Ensure all settings are correct
+3. **Test connectivity:** Verify network and serial connections
+4. **Restart service:** Often fixes temporary issues
+
+### Common Commands Reference
+```bash
+# Service management
+sudo systemctl start/stop/restart/status atos-high-volume.service
+
+# Log viewing
+sudo journalctl -u atos-high-volume.service -f
+
+# Configuration backup
+cp forwarding_config.json backup_$(date +%Y%m%d).json
+
+# Quick status check
+curl http://localhost:5000/api/stats
+
+# Network connectivity test
+ping [TAK_SERVER_IP]
+```
+
+## 📝 Version History
+
+### Current Version: High-Volume Optimized
+- **Optimized for 100+ devices**
+- **Queue-based processing**
+- **Multicast support**
+- **Advanced rate limiting**
+- **Comprehensive logging**
+- **Web dashboard**
+- **TAK integration**
+
+### Previous Versions
+- Basic ATOS tracker display
+- Simple TAK forwarding
+- Manual configuration
+
+---
+
+**Note:** This system is designed for high-volume ATOS tracker environments. For smaller deployments (< 10 devices), consider using the basic version for simplicity.
