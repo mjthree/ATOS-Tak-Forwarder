@@ -40,14 +40,20 @@ chmod +x marshall_tak_high_volume.py
 
 # Install Python dependencies
 echo "🐍 Installing Python dependencies..."
+echo "   Checking for pip3..."
 if command -v pip3 &> /dev/null; then
+    echo "   Found pip3, installing dependencies..."
     pip3 install -r requirements.txt
-elif command -v python3 -m pip &> /dev/null; then
+elif python3 -c "import pip" &> /dev/null; then
+    echo "   Found python3 -m pip, installing dependencies..."
     python3 -m pip install -r requirements.txt
 else
     echo "⚠️ pip not found, installing pip first..."
-    sudo apt update
-    sudo apt install -y python3-pip
+    echo "   Updating package list..."
+    apt update
+    echo "   Installing python3-pip..."
+    apt install -y python3-pip
+    echo "   Installing dependencies with pip3..."
     pip3 install -r requirements.txt
 fi
 
