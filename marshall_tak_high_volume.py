@@ -453,8 +453,8 @@ class OptimizedTAKClient:
                         print(f"❌ Multicast socket not available for tag {tag_id}")
                     else:
                         try:
-                            print(f"🔍 Attempting multicast send to 224.0.0.1:{multicast_port} for tag {tag_id}")
-                            self.multicast_sock.sendto(cot_message, ('224.0.0.1', multicast_port))
+                            print(f"🔍 Attempting multicast send to 239.2.3.1:{multicast_port} for tag {tag_id}")
+                            self.multicast_sock.sendto(cot_message, ('239.2.3.1', multicast_port))
                             print(f"✅ Multicast send successful for tag {tag_id}")
                         except Exception as e:
                             print(f"⚠️ Multicast send failed for tag {tag_id}: {e}")
@@ -467,7 +467,7 @@ class OptimizedTAKClient:
         stats['udp_sends'] += sent_count
         stats['batch_sends'] += 1
         if sent_count > 0:
-            print(f"📤 Sent batch of {sent_count} messages to {host}:{port} and multicast {multicast_port}")
+            print(f"📤 Sent batch of {sent_count} messages to {host}:{port} and multicast 239.2.3.1:{multicast_port}")
     
     def close(self):
         """Close the multicast socket"""
