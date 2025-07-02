@@ -548,6 +548,22 @@ def tak_sender_loop():
             interval = 10
         time.sleep(max(1, interval))
 
+def tak_sender_loop():
+    """Periodically send all non-stale tag data to the TAK server."""
+    global tak_client, tag_data, forwarding_config, tak_server_config
+    while True:
+        try:
+            tak_client.send_updates_for_changed_tags(tag_data, forwarding_config, tak_server_config)
+        except Exception as e:
+            print(f"Error in periodic TAK send: {e}")
+        interval = tak_server_config.get('send_interval', 10)
+        try:
+            interval = float(interval)
+        except (TypeError, ValueError):
+            interval = 10
+        time.sleep(max(1, interval))
+
+
 # ==== API endpoints for web controls ====
 
 @app.route('/api/tags')
