@@ -240,6 +240,7 @@ def log_tak_config_update():
         print(f"Error logging TAK config update: {e}")
 
 
+
 def enqueue_tag_for_sending(tag):
     """Add a parsed tag update to the sending queue."""
     try:

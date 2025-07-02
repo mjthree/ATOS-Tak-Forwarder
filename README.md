@@ -197,10 +197,12 @@ See `GIT_SETUP.md` for detailed Git workflow and best practices.
 - `forwarding_config.json` - TAK forwarding settings
 - `tak_server_config.json` - TAK server connection settings. Includes
 
+
   `send_interval` which throttles how quickly updates are forwarded to the
   TAK server. The value can be adjusted on the web dashboard via a drop-down
   menu (2–60 seconds). Parsed tag updates are queued and sent in order using
   this interval as the delay between messages.
+
 
 - `templates.json` - Saved configuration templates
 
