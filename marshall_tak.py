@@ -427,7 +427,6 @@ def serial_reader():
                         data = ser.read(ser.in_waiting)
                         buffer += data
                         packets, buffer = extract_packets_from_buffer(buffer)
-                        tag_data_changed = False
                         for packet in packets:
                             stats['total_packets'] += 1
                             stats['last_update'] = datetime.now().strftime('%H:%M:%S')
@@ -446,7 +445,6 @@ def serial_reader():
                                     if len(packet_history) > 50:
                                         packet_history.pop(0)
                                     export_json()
-                                    tag_data_changed = True
                             elif len(packet) >= 3:
                                 result = parse_fiftysix_packet(packet)
                                 if result:
@@ -454,9 +452,7 @@ def serial_reader():
                                     if len(packet_history) > 50:
                                         packet_history.pop(0)
                                     export_json()
-                        # After processing all packets, send updates for changed tags
-                        if tag_data_changed:
-                            tak_client.send_updates_for_changed_tags(tag_data, forwarding_config, tak_server_config)
+                        # Actual TAK forwarding occurs in tak_sender_loop
                     time.sleep(0.01)
                 except serial.SerialException as e:
                     print(f"Serial communication error: {e}")
@@ -552,7 +548,6 @@ def tak_sender_loop():
             interval = 10
         time.sleep(max(1, interval))
 
-
 def tak_sender_loop():
     """Periodically send all non-stale tag data to the TAK server."""
     global tak_client, tag_data, forwarding_config, tak_server_config
@@ -567,6 +562,7 @@ def tak_sender_loop():
         except (TypeError, ValueError):
             interval = 10
         time.sleep(max(1, interval))
+
 
 # ==== API endpoints for web controls ====
 
