@@ -9,7 +9,10 @@ User=pi
 Group=pi
 WorkingDirectory=/home/pi/atos-newest
 Environment=PYTHONPATH=/home/pi/atos-newest
+Environment=DISPLAY=:0
+ExecStartPre=/bin/bash -c 'sleep 3'
 ExecStart=/home/pi/atos-newest/venv/bin/python /home/pi/atos-newest/marshall_tak.py
+ExecStartPost=/bin/bash -c 'sleep 5 && export DISPLAY=:0 && chromium-browser --start-maximized http://$(hostname -I | awk "{print \$1}"):5000/display >/dev/null 2>&1 &'
 Restart=always
 RestartSec=10
 StandardOutput=journal
