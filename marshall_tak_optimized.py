@@ -50,8 +50,8 @@ stats = {
 }
 
 # Create logging directories
-LOGS_DIR = Path("comprehensive_logs")
-LOGS_DIR.mkdir(exist_ok=True)
+LOGS_DIR = Path("/var/log/atos-tak-forwarder/comprehensive_logs")
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Logging files
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
