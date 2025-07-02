@@ -401,6 +401,10 @@ class OptimizedTAKClient:
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)  # Larger send buffer
+        
+        # Create multicast socket once
+        self.multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
 
     def create_cot_message(self, tag_id: str, tag_data: Dict[str, Any], callsign: str) -> Optional[bytes]:
         try:
@@ -440,10 +444,7 @@ class OptimizedTAKClient:
                     
                     # Send to multicast (UDP 6969)
                     try:
-                        multicast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-                        multicast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-                        multicast_sock.sendto(cot_message, ('224.0.0.1', multicast_port))
-                        multicast_sock.close()
+                        self.multicast_sock.sendto(cot_message, ('224.0.0.1', multicast_port))
                     except Exception as e:
                         print(f"⚠️ Multicast send failed for tag {tag_id}: {e}")
                     
@@ -456,6 +457,13 @@ class OptimizedTAKClient:
         stats['batch_sends'] += 1
         if sent_count > 0:
             print(f"📤 Sent batch of {sent_count} messages to {host}:{port} and multicast {multicast_port}")
+    
+    def close(self):
+        """Close the multicast socket"""
+        try:
+            self.multicast_sock.close()
+        except:
+            pass
 
 # ==== Optimized Worker Threads ====
 def packet_processor():
