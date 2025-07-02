@@ -19,7 +19,6 @@ from pathlib import Path
 import signal
 import sys
 import socket
-import queue
 from typing import Dict, Any, Optional
 
 app = Flask(__name__)
@@ -30,7 +29,6 @@ app = Flask(__name__)
 tag_data = {}
 TAG_DATA_LOCK = threading.Lock()
 packet_history = []
-send_queue = queue.Queue()
 stats = {
     'total_packets': 0,
     'last_update': None,
@@ -240,13 +238,6 @@ def log_tak_config_update():
         print(f"Error logging TAK config update: {e}")
 
 
-
-def enqueue_tag_for_sending(tag):
-    """Add a parsed tag update to the sending queue."""
-    try:
-        send_queue.put_nowait(tag)
-    except queue.Full:
-        print("⚠️  Send queue is full, dropping update")
 
 
 def send_tag_via_tak(tag):
@@ -480,7 +471,6 @@ def serial_reader():
                                     if len(packet_history) > 50:
                                         packet_history.pop(0)
                                     export_json()
-                                    enqueue_tag_for_sending(result)
                             elif len(packet) >= 3:
                                 result = parse_fiftysix_packet(packet)
                                 if result:
@@ -549,7 +539,7 @@ class AtosTAKClient:
         with TAG_DATA_LOCK:
             tag_items = list(tags.items())
         for tag_id, tag in tag_items:
-            if tag.get('stale', False):
+            if get_tag_staleness(tag):
                 continue
             cfg = forwarding_config['tags'].get(str(tag_id), {})
             should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
@@ -573,21 +563,21 @@ class AtosTAKClient:
 
 
 def tak_sender_worker():
-    """Send queued tag updates to the TAK server as they arrive."""
+    """Periodically forward all non-stale tags to the TAK server."""
     global tak_client
     while True:
-        tag = send_queue.get()
+        with TAG_DATA_LOCK:
+            snapshot = {tid: data.copy() for tid, data in tag_data.items()}
         try:
-            send_tag_via_tak(tag)
+            tak_client.send_updates_for_changed_tags(snapshot, forwarding_config, tak_server_config)
         except Exception as e:
-            print(f"Error sending tag {tag.get('tag_id')}: {e}")
+            print(f"Error sending tag updates: {e}")
         interval = tak_server_config.get('send_interval', 1)
         try:
             interval = float(interval)
         except (TypeError, ValueError):
             interval = 1
         time.sleep(max(0, interval))
-        send_queue.task_done()
 
 # ==== API endpoints for web controls ====
 
