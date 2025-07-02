@@ -61,9 +61,9 @@ TAG_STATUS_LOG_FILE = LOGS_DIR / f"tag_status_{timestamp}.jsonl"
 TAK_FORWARD_LOG_FILE = LOGS_DIR / f"tak_forwarding_{timestamp}.log"
 
 # ==== Config management for new features ====
-FORWARDING_CONFIG_FILE = 'forwarding_config.json'
-TAK_SERVER_CONFIG_FILE = 'tak_server_config.json'
-TEMPLATES_FILE = 'templates.json'
+FORWARDING_CONFIG_FILE = '/etc/atos-tak-forwarder/forwarding_config.json'
+TAK_SERVER_CONFIG_FILE = '/etc/atos-tak-forwarder/tak_server_config.json'
+TEMPLATES_FILE = '/etc/atos-tak-forwarder/templates.json'
 
 def load_forwarding_config():
     if not os.path.exists(FORWARDING_CONFIG_FILE):

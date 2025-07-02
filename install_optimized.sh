@@ -318,25 +318,6 @@ EOF
     print_status "Systemd service created"
 }
 
-# Function to setup serial port access
-setup_serial() {
-    print_header "Setting Up Serial Port Access"
-    
-    # Add user to dialout group (if not root)
-    if [[ "$SUDO_USER" ]]; then
-        usermod -a -G dialout "$SUDO_USER"
-        print_status "Added user $SUDO_USER to dialout group"
-    fi
-    
-    # Configure serial port on Raspberry Pi
-    if command -v raspi-config &> /dev/null; then
-        print_status "Configuring serial port (Raspberry Pi)"
-        raspi-config nonint do_serial 2
-    fi
-    
-    print_status "Serial port setup completed"
-}
-
 # Function to create log rotation
 setup_logging() {
     print_header "Setting Up Log Rotation"
@@ -487,9 +468,6 @@ main() {
     
     # Create systemd service
     create_service
-    
-    # Setup serial port access
-    setup_serial
     
     # Setup log rotation
     setup_logging
