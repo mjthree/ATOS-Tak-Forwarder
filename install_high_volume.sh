@@ -40,7 +40,16 @@ chmod +x marshall_tak_high_volume.py
 
 # Install Python dependencies
 echo "🐍 Installing Python dependencies..."
-python3 -m pip install -r requirements.txt
+if command -v pip3 &> /dev/null; then
+    pip3 install -r requirements.txt
+elif command -v python3 -m pip &> /dev/null; then
+    python3 -m pip install -r requirements.txt
+else
+    echo "⚠️ pip not found, installing pip first..."
+    sudo apt update
+    sudo apt install -y python3-pip
+    pip3 install -r requirements.txt
+fi
 
 # Create simple systemd service
 echo "🔧 Creating systemd service..."
