@@ -948,16 +948,31 @@ def api_db_tags():
 
 @app.route('/api/db/tag_data')
 def api_db_tag_data():
-    # Query: ?tag_id=1&start=...&end=...
-    tag_id = int(request.args.get('tag_id'))
+    # Query: ?tag_id=1&start=...&end=...&minutes=...
+    tag_id_param = request.args.get('tag_id')
+    if tag_id_param is None:
+        return jsonify({'error': 'tag_id parameter is required'}), 400
+    tag_id = int(tag_id_param)
     start = request.args.get('start')
     end = request.args.get('end')
+    minutes = request.args.get('minutes')
+    if minutes:
+        try:
+            minutes = int(minutes)
+            from datetime import datetime, timedelta
+            now = datetime.utcnow()
+            start_dt = now - timedelta(minutes=minutes)
+            # Format as string matching DB timestamp format (assume ISO or similar)
+            start = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            print(f"[ERROR] Invalid minutes param: {e}")
+            start = None
     q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
     params = [tag_id]
-    if start:
+    if start is not None and start != '':
         q += ' AND timestamp >= ?'
         params.append(start)
-    if end:
+    if end is not None and end != '':
         q += ' AND timestamp <= ?'
         params.append(end)
     q += ' ORDER BY timestamp'
@@ -1002,10 +1017,10 @@ def api_db_export_kml():
     color = request.args.get('color', 'ff0000ff')
     q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
     params = [tag_id]
-    if start:
+    if start is not None and start != '':
         q += ' AND timestamp >= ?'
         params.append(start)
-    if end:
+    if end is not None and end != '':
         q += ' AND timestamp <= ?'
         params.append(end)
     q += ' ORDER BY timestamp'
