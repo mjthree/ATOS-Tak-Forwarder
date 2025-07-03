@@ -991,6 +991,7 @@ def api_db_export_csv():
     tag_id = int(request.args.get('tag_id'))
     start = request.args.get('start')
     end = request.args.get('end')
+    dz_altitude = request.args.get('dz_altitude', type=float)
     q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
     params = [tag_id]
     if start:
@@ -1004,9 +1005,15 @@ def api_db_export_csv():
         rows = conn.execute(q, params).fetchall()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['timestamp', 'altitude_ft'])
-    for row in rows:
-        writer.writerow([row['timestamp'], row['altitude_ft']])
+    if dz_altitude is not None:
+        writer.writerow(['timestamp', 'altitude_ft', 'altitude_agl'])
+        for row in rows:
+            agl = max(0, row['altitude_ft'] - dz_altitude)
+            writer.writerow([row['timestamp'], row['altitude_ft'], agl])
+    else:
+        writer.writerow(['timestamp', 'altitude_ft'])
+        for row in rows:
+            writer.writerow([row['timestamp'], row['altitude_ft']])
     output.seek(0)
     filename = f"tag_{tag_id}_{start or 'all'}_{end or 'all'}.csv"
     response = make_response(output.read())
@@ -1020,6 +1027,7 @@ def api_db_export_kml():
     start = request.args.get('start')
     end = request.args.get('end')
     color = request.args.get('color', 'ff0000ff')
+    dz_altitude = request.args.get('dz_altitude', type=float)
     q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
     params = [tag_id]
     if start is not None and start != '':
@@ -1032,26 +1040,11 @@ def api_db_export_kml():
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
     whens = '\n'.join(f"<when>{row['timestamp'].replace(' ','T')}Z</when>" for row in rows)
-    coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows)
-    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
-  <Document>
-    <name>Tag {tag_id} Timed Track</name>
-    <Style id="trackStyle"><LineStyle><color>{color}</color><width>3</width></LineStyle><PolyStyle><color>7f00ff00</color></PolyStyle></Style>
-    <Placemark>
-      <name>Tag {tag_id} Track</name>
-      <styleUrl>#trackStyle</styleUrl>
-      <gx:MultiTrack>
-        <gx:interpolate>1</gx:interpolate>
-        <gx:Track>
-          <gx:altitudeMode>absolute</gx:altitudeMode>
-          {whens}
-          {coords}
-        </gx:Track>
-      </gx:MultiTrack>
-    </Placemark>
-  </Document>
-</kml>'''
+    if dz_altitude is not None:
+        coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {max(0, row['altitude_ft'] - dz_altitude)}</gx:coord>" for row in rows)
+    else:
+        coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows)
+    kml = f'''<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n  <Document>\n    <name>Tag {tag_id} Timed Track</name>\n    <Style id="trackStyle"><LineStyle><color>{color}</color><width>3</width></LineStyle><PolyStyle><color>7f00ff00</color></PolyStyle></Style>\n    <Placemark>\n      <name>Tag {tag_id} Track</name>\n      <styleUrl>#trackStyle</styleUrl>\n      <gx:MultiTrack>\n        <gx:interpolate>1</gx:interpolate>\n        <gx:Track>\n          <gx:altitudeMode>absolute</gx:altitudeMode>\n          {whens}\n          {coords}\n        </gx:Track>\n      </gx:MultiTrack>\n    </Placemark>\n  </Document>\n</kml>'''
     filename = f"tag_{tag_id}_{start or 'all'}_{end or 'all'}.kml"
     response = make_response(kml)
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
