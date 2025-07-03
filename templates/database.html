@@ -85,6 +85,10 @@ function fetchTagData(tagId, minutes) {
         .then(data => {
             tagData = data;
             dataReady = true;
+            // Always reset slider and chart to match new data
+            slider = null;
+            sliderTimestamps = [];
+            sliderRange = [0, 0];
             drawChart();
             setupSlider();
         });
