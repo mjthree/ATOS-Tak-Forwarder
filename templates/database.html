@@ -79,8 +79,8 @@ function fetchTagData(tagId) {
         .then(data => {
             tagData = data;
             dataReady = true;
-            drawChart();
-            setupSlider();
+            console.log('[fetchTagData] Data fetched:', tagData.length, 'records');
+            setupSlider(); // Only set up slider after data is ready
         });
 }
 
@@ -88,14 +88,16 @@ document.getElementById('tag-select').onchange = function() {
     fetchTagData(this.value);
 };
 
-function drawChart() {
-    if (!tagData || tagData.length === 0) return;
+function drawChart(dataToDraw) {
+    if (!dataToDraw || dataToDraw.length === 0) {
+        console.log('[drawChart] No data to draw.');
+        return;
+    }
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
-    const labels = tagData.map(d => d.timestamp);
-    const altitudes = tagData.map(d => Number(d.altitude_ft));
-    console.log('labels:', labels);
-    console.log('altitudes:', altitudes);
+    const labels = dataToDraw.map(d => d.timestamp);
+    const altitudes = dataToDraw.map(d => Number(d.altitude_ft));
+    console.log('[drawChart] Drawing chart with', labels.length, 'labels and', altitudes.length, 'altitudes');
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -123,7 +125,10 @@ function setupSlider() {
     sliderReady = false;
     const sliderDiv = document.getElementById('slider');
     sliderDiv.innerHTML = '';
-    if (tagData.length < 2) return;
+    if (tagData.length < 2) {
+        drawChart(tagData); // Draw full chart if not enough data for slider
+        return;
+    }
     sliderTimestamps = tagData.map(d => new Date(d.timestamp).getTime());
     sliderRange = [0, sliderTimestamps.length - 1];
     sliderDiv.innerHTML = '<div id="slider-el"></div>';
@@ -153,47 +158,15 @@ function zoomChartToSlider() {
     startIdx = Math.max(0, Math.min(startIdx, tagData.length - 1));
     endIdx = Math.max(0, Math.min(endIdx, tagData.length - 1));
     if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
-    const xMin = tagData[startIdx]?.timestamp || tagData[0].timestamp;
-    const xMax = tagData[endIdx]?.timestamp || tagData[tagData.length-1].timestamp;
     // If slider is at full range, show all data
     if (startIdx === 0 && endIdx === tagData.length - 1) {
-        drawChart();
+        console.log('[zoomChartToSlider] Slider at full range, drawing full chart.');
+        drawChart(tagData);
         return;
     }
     const zoomedData = tagData.slice(startIdx, endIdx + 1);
-    const ctx = document.getElementById('altitude-chart').getContext('2d');
-    if (chart) { chart.destroy(); chart = null; }
-    const labels = zoomedData.map(d => d.timestamp);
-    const altitudes = zoomedData.map(d => Number(d.altitude_ft));
-    console.log('labels:', labels);
-    console.log('altitudes:', altitudes);
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Altitude (ft)',
-                data: altitudes,
-                borderColor: '#0074D9',
-                backgroundColor: 'rgba(0,116,217,0.1)',
-                pointRadius: 1,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: {
-                    type: 'time',
-                    time: { unit: 'minute' },
-                    title: { display: true, text: 'Time' },
-                    min: xMin,
-                    max: xMax
-                },
-                y: { title: { display: true, text: 'Altitude (ft)' } }
-            }
-        }
-    });
+    console.log('[zoomChartToSlider] Drawing zoomed chart from', startIdx, 'to', endIdx, '(', zoomedData.length, 'records )');
+    drawChart(zoomedData);
 }
 
 function getSliderTimeRange() {
