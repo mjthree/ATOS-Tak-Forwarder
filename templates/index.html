@@ -108,7 +108,16 @@ function updateTable(tags){
   for(const [id,tag] of Object.entries(tags)){
     const tr=document.createElement('tr');
     if(tag.stale) tr.classList.add('stale-row');
-    tr.innerHTML = `<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.bad_gps?'Bad':'Good'}</td><td>${tag.latitude!==undefined?tag.latitude.toFixed(6):'N/A'}</td><td>${tag.longitude!==undefined?tag.longitude.toFixed(6):'N/A'}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp?tag.timestamp.slice(0,8):'N/A'}</td>`;
+    const lat = tag.latitude!==undefined ? tag.latitude.toFixed(6) : 'N/A';
+    const lon = tag.longitude!==undefined ? tag.longitude.toFixed(6) : 'N/A';
+    let latCell = lat;
+    let lonCell = lon;
+    if(lat !== 'N/A' && lon !== 'N/A') {
+      const url = `https://www.google.com/maps?q=${lat},${lon}`;
+      latCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lat}</a>`;
+      lonCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lon}</a>`;
+    }
+    tr.innerHTML = `<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.bad_gps?'Bad':'Good'}</td><td>${latCell}</td><td>${lonCell}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp?tag.timestamp.slice(0,8):'N/A'}</td>`;
     const f=document.createElement('td');
     const chk=document.createElement('input');
     chk.type='checkbox';chk.checked=tag.forward;
