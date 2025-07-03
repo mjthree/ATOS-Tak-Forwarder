@@ -51,6 +51,8 @@ let chart = null;
 let slider = null;
 let sliderRange = [0, 0];
 let sliderTimestamps = [];
+let sliderReady = false;
+let dataReady = false;
 
 function fetchTags() {
     fetch('/api/db/tags').then(r => r.json()).then(tags => {
@@ -71,13 +73,14 @@ function fetchTags() {
 }
 
 function fetchTagData(tagId) {
+    dataReady = false;
     fetch(`/api/db/tag_data?tag_id=${tagId}`)
         .then(r => r.json())
         .then(data => {
             tagData = data;
+            dataReady = true;
             drawChart();
             setupSlider();
-            zoomChartToSlider();
         });
 }
 
@@ -86,10 +89,13 @@ document.getElementById('tag-select').onchange = function() {
 };
 
 function drawChart() {
+    if (!tagData || tagData.length === 0) return;
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
     const labels = tagData.map(d => d.timestamp);
     const altitudes = tagData.map(d => Number(d.altitude_ft));
+    console.log('labels:', labels);
+    console.log('altitudes:', altitudes);
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -114,6 +120,7 @@ function drawChart() {
 }
 
 function setupSlider() {
+    sliderReady = false;
     const sliderDiv = document.getElementById('slider');
     sliderDiv.innerHTML = '';
     if (tagData.length < 2) return;
@@ -133,8 +140,10 @@ function setupSlider() {
         }
     });
     slider.noUiSlider.on('update', function(values, handle) {
-        zoomChartToSlider();
+        if (dataReady) zoomChartToSlider();
     });
+    sliderReady = true;
+    if (dataReady) zoomChartToSlider();
 }
 
 function zoomChartToSlider() {
@@ -150,10 +159,13 @@ function zoomChartToSlider() {
         return;
     }
     const zoomedData = tagData.slice(startIdx, endIdx + 1);
+    if (zoomedData.length === 0) return;
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
     const labels = zoomedData.map(d => d.timestamp);
     const altitudes = zoomedData.map(d => Number(d.altitude_ft));
+    console.log('labels:', labels);
+    console.log('altitudes:', altitudes);
     const xMin = tagData[startIdx]?.timestamp || tagData[0].timestamp;
     const xMax = tagData[endIdx]?.timestamp || tagData[tagData.length-1].timestamp;
     chart = new Chart(ctx, {
