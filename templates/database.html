@@ -89,7 +89,7 @@ function drawChart() {
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
     const labels = tagData.map(d => d.timestamp);
-    const altitudes = tagData.map(d => d.altitude_ft);
+    const altitudes = tagData.map(d => Number(d.altitude_ft));
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -153,7 +153,7 @@ function zoomChartToSlider() {
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
     const labels = zoomedData.map(d => d.timestamp);
-    const altitudes = zoomedData.map(d => d.altitude_ft);
+    const altitudes = zoomedData.map(d => Number(d.altitude_ft));
     const xMin = tagData[startIdx]?.timestamp || tagData[0].timestamp;
     const xMax = tagData[endIdx]?.timestamp || tagData[tagData.length-1].timestamp;
     chart = new Chart(ctx, {
