@@ -152,12 +152,12 @@ function updateTak(){
   const ip=document.getElementById('tak-ip').value;
   const port=document.getElementById('tak-port').value;
   const multicast_port=document.getElementById('multicast-port').value;
-  const send_interval=document.getElementById('tdma-interval').value;
+  const tdma_interval=document.getElementById('tdma-interval').value;
   const disable_multicast=document.getElementById('disable-multicast').checked;
   fetch('/api/tak_server',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ip,port,multicast_port,send_interval,disable_multicast})
+    body:JSON.stringify({ip,port,multicast_port,tdma_interval,disable_multicast})
   });
 }
  document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
