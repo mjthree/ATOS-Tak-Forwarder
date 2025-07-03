@@ -216,9 +216,16 @@ function zoomChartToSlider() {
 
 function getSliderTimeRange() {
     if (!slider || tagData.length < 2) return [null, null];
-    const [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
-    const start = tagData[startIdx]?.timestamp;
-    const end = tagData[endIdx]?.timestamp;
+    let [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
+    // Clamp indices to valid range
+    startIdx = Math.max(0, Math.min(startIdx, tagData.length - 1));
+    endIdx = Math.max(0, Math.min(endIdx, tagData.length - 1));
+    if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
+    let start = tagData[startIdx]?.timestamp;
+    let end = tagData[endIdx]?.timestamp;
+    // Fallback if indices are still invalid
+    if (!start) start = tagData[0]?.timestamp;
+    if (!end) end = tagData[tagData.length-1]?.timestamp;
     console.log('Slider:', slider, 'tagData.length:', tagData.length);
     console.log('Slider get:', slider ? slider.noUiSlider.get() : null);
     console.log('tagData[0]:', tagData[0], 'tagData[tagData.length-1]:', tagData[tagData.length-1]);
