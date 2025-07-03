@@ -77,6 +77,7 @@ function fetchTagData(tagId) {
             tagData = data;
             drawChart();
             setupSlider();
+            zoomChartToSlider();
         });
 }
 
@@ -129,6 +130,40 @@ function setupSlider() {
         format: {
             to: i => new Date(sliderTimestamps[Math.round(i)]).toLocaleString(),
             from: Number
+        }
+    });
+    slider.noUiSlider.on('update', function(values, handle) {
+        zoomChartToSlider();
+    });
+}
+
+function zoomChartToSlider() {
+    if (!slider || tagData.length < 2) return;
+    const [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
+    const zoomedData = tagData.slice(startIdx, endIdx + 1);
+    const ctx = document.getElementById('altitude-chart').getContext('2d');
+    if (chart) { chart.destroy(); chart = null; }
+    const labels = zoomedData.map(d => d.timestamp);
+    const altitudes = zoomedData.map(d => d.altitude_ft);
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Altitude (ft)',
+                data: altitudes,
+                borderColor: '#0074D9',
+                backgroundColor: 'rgba(0,116,217,0.1)',
+                pointRadius: 1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { type: 'time', time: { unit: 'minute' }, title: { display: true, text: 'Time' } },
+                y: { title: { display: true, text: 'Altitude (ft)' } }
+            }
         }
     });
 }
