@@ -221,7 +221,8 @@ document.getElementById('export-csv').onclick = function() {
     const tagId = document.getElementById('tag-select').value;
     const [start, end] = getSliderTimeRange();
     let url = `/api/db/export_csv?tag_id=${tagId}`;
-    if (start && end) url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    if (start) url += `&start=${encodeURIComponent(start)}`;
+    if (end) url += `&end=${encodeURIComponent(end)}`;
     window.open(url, '_blank');
 };
 
@@ -230,7 +231,8 @@ document.getElementById('export-kml').onclick = function() {
     const [start, end] = getSliderTimeRange();
     const color = document.getElementById('kml-color').value;
     let url = `/api/db/export_kml?tag_id=${tagId}&color=${color}`;
-    if (start && end) url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    if (start) url += `&start=${encodeURIComponent(start)}`;
+    if (end) url += `&end=${encodeURIComponent(end)}`;
     window.open(url, '_blank');
 };
 
