@@ -1063,7 +1063,7 @@ def api_db_export_kml():
       <name>Tag {tag_id} Path</name>
       <styleUrl>#lineStyle</styleUrl>
       <LineString>
-        <altitudeMode>absolute</altitudeMode>
+        <altitudeMode>relativeToGround</altitudeMode>
         <coordinates>
 {coords3d}
         </coordinates>
