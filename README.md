@@ -56,7 +56,7 @@ A comprehensive system for forwarding ATOS tracker data to TAK servers with real
 ## 🛠️ Installation
 
 ### Step 1: System Preparation
-```bash
+   ```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
 
@@ -68,18 +68,18 @@ sudo usermod -a -G dialout pi
 ```
 
 ### Step 2: Repository Setup
-```bash
+   ```bash
 # Clone repository
-cd /home/pi
+   cd /home/pi
 git clone https://github.com/mjthree/ATOS-Tak-Forwarder.git
 cd ATOS-Tak-Forwarder
 
 # Pull latest changes
 git pull origin main
-```
+   ```
 
 ### Step 3: High-Volume Service Installation
-```bash
+   ```bash
 # Run the high-volume installer
 chmod +x install_high_volume.sh
 sudo ./install_high_volume.sh
@@ -95,7 +95,7 @@ The installer will:
 ### Step 4: Configuration
 
 #### Serial Port Configuration
-```bash
+   ```bash
 # Find your serial port
 ls /dev/tty*
 
@@ -106,7 +106,7 @@ ls /dev/tty*
 ```
 
 The script automatically uses `/dev/ttyACM0`. If different, edit the service file:
-```bash
+   ```bash
 sudo nano /etc/systemd/system/atos-high-volume.service
 ```
 
@@ -119,7 +119,7 @@ Edit the TAK server settings in the web interface or modify `tak_server_config.j
   "multicast_port": 6969,
   "send_interval": 2
 }
-```
+   ```
 
 ### Step 5: Service Management
 ```bash
@@ -211,18 +211,18 @@ tail -f comprehensive_logs/tak_forwarding.log
 ```
 
 ### Service Logs
-```bash
+   ```bash
 # View service logs
 sudo journalctl -u atos-high-volume.service -f
 
 # View last 50 log entries
 sudo journalctl -u atos-high-volume.service -n 50
-```
+   ```
 
 ## 🔄 Updates and Maintenance
 
 ### Updating the Forwarder
-```bash
+   ```bash
 # Stop the service
 sudo systemctl stop atos-high-volume.service
 
@@ -242,16 +242,16 @@ sudo systemctl status atos-high-volume.service
 ```
 
 ### Backup Configuration
-```bash
+   ```bash
 # Backup current configuration
 cp forwarding_config.json forwarding_config_backup.json
 cp tak_server_config.json tak_server_config_backup.json
-```
+   ```
 
 ## 🚨 Troubleshooting
 
 ### Service Won't Start
-```bash
+   ```bash
 # Check service status
 sudo systemctl status atos-high-volume.service
 
@@ -265,7 +265,7 @@ python3 -m py_compile marshall_tak_high_volume.py
 ### Common Issues
 
 #### 1. Serial Port Access
-```bash
+   ```bash
 # Check if user is in dialout group
 groups pi
 
@@ -274,10 +274,10 @@ sudo usermod -a -G dialout pi
 
 # Reboot or logout/login
 sudo reboot
-```
+   ```
 
 #### 2. Port Already in Use
-```bash
+   ```bash
 # Check what's using port 5000
 sudo netstat -tlnp | grep :5000
 
