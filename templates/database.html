@@ -84,6 +84,7 @@ function fetchTagData(tagId, minutes) {
         .then(r => r.json())
         .then(data => {
             tagData = data;
+            console.log('Fetched tagData:', tagData);
             dataReady = true;
             // Always reset slider and chart to match new data
             slider = null;
