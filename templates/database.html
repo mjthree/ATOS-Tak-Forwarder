@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATOS Database Explorer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/distribute/nouislider.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/distribute/nouislider.min.css">
+    <style>
+        body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
+        .header{background:#2c3e50;color:#fff;padding:20px;margin:0 0 20px 0;}
+        .container{max-width:900px;margin:0 auto;padding:20px;}
+        #chart-container{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 8px #0001;}
+        #slider{margin:30px 0;}
+        .export-btn{margin-right:10px;}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>📊 ATOS Database Explorer</h1>
+</div>
+<div class="container">
+    <label for="tag-select">Select Tag:</label>
+    <select id="tag-select"></select>
+    <div id="slider"></div>
+    <div id="chart-container">
+        <canvas id="altitude-chart" height="300"></canvas>
+    </div>
+    <div style="margin-top:20px;">
+        <button class="export-btn" id="export-csv">Export CSV</button>
+        <button class="export-btn" id="export-kml">Export KML</button>
+    </div>
+</div>
+<script>
+let tagList = [];
+let tagData = [];
+let chart = null;
+let slider = null;
+let sliderRange = [0, 0];
+let sliderTimestamps = [];
+
+function fetchTags() {
+    fetch('/api/db/tags').then(r => r.json()).then(tags => {
+        tagList = tags;
+        const sel = document.getElementById('tag-select');
+        sel.innerHTML = '';
+        tags.forEach(t => {
+            const o = document.createElement('option');
+            o.value = t;
+            o.text = t;
+            sel.appendChild(o);
+        });
+        if (tags.length > 0) {
+            sel.value = tags[0];
+            fetchTagData(tags[0]);
+        }
+    });
+}
+
+function fetchTagData(tagId) {
+    fetch(`/api/db/tag_data?tag_id=${tagId}`)
+        .then(r => r.json())
+        .then(data => {
+            tagData = data;
+            drawChart();
+            setupSlider();
+        });
+}
+
+document.getElementById('tag-select').onchange = function() {
+    fetchTagData(this.value);
+};
+
+function drawChart() {
+    const ctx = document.getElementById('altitude-chart').getContext('2d');
+    if (chart) chart.destroy();
+    const labels = tagData.map(d => d.timestamp);
+    const altitudes = tagData.map(d => d.altitude_ft);
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Altitude (ft)',
+                data: altitudes,
+                borderColor: '#0074D9',
+                backgroundColor: 'rgba(0,116,217,0.1)',
+                pointRadius: 1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { type: 'time', time: { unit: 'minute' }, title: { display: true, text: 'Time' } },
+                y: { title: { display: true, text: 'Altitude (ft)' } }
+            }
+        }
+    });
+}
+
+function setupSlider() {
+    const sliderDiv = document.getElementById('slider');
+    sliderDiv.innerHTML = '';
+    if (tagData.length < 2) return;
+    sliderTimestamps = tagData.map(d => new Date(d.timestamp).getTime());
+    sliderRange = [0, sliderTimestamps.length - 1];
+    sliderDiv.innerHTML = '<div id="slider-el"></div>';
+    slider = document.getElementById('slider-el');
+    noUiSlider.create(slider, {
+        start: sliderRange,
+        connect: true,
+        range: { min: 0, max: sliderTimestamps.length - 1 },
+        step: 1,
+        tooltips: [true, true],
+        format: {
+            to: i => new Date(sliderTimestamps[Math.round(i)]).toLocaleString(),
+            from: Number
+        }
+    });
+}
+
+function getSliderTimeRange() {
+    if (!slider || tagData.length < 2) return [null, null];
+    const [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
+    const start = tagData[startIdx]?.timestamp;
+    const end = tagData[endIdx]?.timestamp;
+    return [start, end];
+}
+
+document.getElementById('export-csv').onclick = function() {
+    const tagId = document.getElementById('tag-select').value;
+    const [start, end] = getSliderTimeRange();
+    let url = `/api/db/export_csv?tag_id=${tagId}`;
+    if (start && end) url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    window.open(url, '_blank');
+};
+
+document.getElementById('export-kml').onclick = function() {
+    const tagId = document.getElementById('tag-select').value;
+    const [start, end] = getSliderTimeRange();
+    let url = `/api/db/export_kml?tag_id=${tagId}`;
+    if (start && end) url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    window.open(url, '_blank');
+};
+
+fetchTags();
+</script>
+</body>
+</html> 

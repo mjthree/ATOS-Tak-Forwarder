@@ -12,7 +12,7 @@ import json
 import threading
 import ctypes
 from datetime import datetime, timedelta, timezone
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file, make_response
 import webbrowser
 import os
 from pathlib import Path
@@ -22,6 +22,9 @@ import socket
 from typing import Dict, Any, Optional
 from collections import deque
 import queue
+import atos_sqlite
+import io
+import csv
 
 app = Flask(__name__)
 
@@ -134,25 +137,24 @@ templates = load_templates()
 # ==== Optimized Logging ====
 def log_tag_update(tag_data_entry):
     try:
-        with open(COMPREHENSIVE_LOG_FILE, 'a') as f:
-            log_entry = {
-                'full_timestamp': datetime.now().isoformat(),
-                'tag_id': tag_data_entry['tag_id'],
-                'battery_voltage': tag_data_entry['battery_voltage'],
-                'latitude': tag_data_entry['latitude'],
-                'longitude': tag_data_entry['longitude'],
-                'altitude_ft': tag_data_entry['altitude_ft'],
-                'bad_gps': tag_data_entry['bad_gps'],
-                'is_fresh': tag_data_entry['is_fresh'],
-                'temperature': tag_data_entry['temperature'],
-                'pdop': tag_data_entry['pdop'],
-                'wire_status': tag_data_entry['wire_status'],
-                'object_status': tag_data_entry['object_status'],
-                'emergency': tag_data_entry['emergency']
-            }
-            f.write(json.dumps(log_entry) + '\n')
+        atos_sqlite.insert_tag_event(
+            timestamp=datetime.now().isoformat(),
+            tag_id=tag_data_entry['tag_id'],
+            latitude=tag_data_entry['latitude'],
+            longitude=tag_data_entry['longitude'],
+            altitude_ft=tag_data_entry['altitude_ft'],
+            battery_voltage=tag_data_entry['battery_voltage'],
+            temperature=tag_data_entry['temperature'],
+            pdop=tag_data_entry['pdop'],
+            wire_status=tag_data_entry['wire_status'],
+            object_status=tag_data_entry['object_status'],
+            emergency=tag_data_entry['emergency'],
+            is_fresh=tag_data_entry['is_fresh'],
+            bad_gps=tag_data_entry['bad_gps'],
+            event_type='tag_update'
+        )
     except Exception as e:
-        print(f"Error logging tag update: {e}")
+        print(f"Error logging tag update to SQLite: {e}")
 
 def log_voltage_tracking(tag_id, voltage, timestamp_str):
     try:
@@ -163,41 +165,24 @@ def log_voltage_tracking(tag_id, voltage, timestamp_str):
 
 def log_tag_status_change(tag_id, old_data, new_data):
     try:
-        if old_data is None:
-            status_entry = {
-                'timestamp': datetime.now().isoformat(),
-                'tag_id': tag_id,
-                'event': 'tag_first_seen',
-                'voltage': new_data['battery_voltage'],
-                'gps_status': 'good' if not new_data['bad_gps'] else 'bad'
-            }
-        else:
-            voltage_diff = abs(new_data['battery_voltage'] - old_data['battery_voltage'])
-            gps_changed = old_data['bad_gps'] != new_data['bad_gps']
-            if voltage_diff >= 0.1:
-                status_entry = {
-                    'timestamp': datetime.now().isoformat(),
-                    'tag_id': tag_id,
-                    'event': 'voltage_change',
-                    'old_voltage': old_data['battery_voltage'],
-                    'new_voltage': new_data['battery_voltage'],
-                    'voltage_diff': round(voltage_diff, 2)
-                }
-            elif gps_changed:
-                status_entry = {
-                    'timestamp': datetime.now().isoformat(),
-                    'tag_id': tag_id,
-                    'event': 'gps_status_change',
-                    'old_gps': 'good' if not old_data['bad_gps'] else 'bad',
-                    'new_gps': 'good' if not new_data['bad_gps'] else 'bad',
-                    'voltage': new_data['battery_voltage']
-                }
-            else:
-                return
-        with open(TAG_STATUS_LOG_FILE, 'a') as f:
-            f.write(json.dumps(status_entry) + '\n')
+        atos_sqlite.insert_tag_event(
+            timestamp=datetime.now().isoformat(),
+            tag_id=tag_id,
+            latitude=new_data.get('latitude'),
+            longitude=new_data.get('longitude'),
+            altitude_ft=new_data.get('altitude_ft'),
+            battery_voltage=new_data.get('battery_voltage'),
+            temperature=new_data.get('temperature'),
+            pdop=new_data.get('pdop'),
+            wire_status=new_data.get('wire_status'),
+            object_status=new_data.get('object_status'),
+            emergency=new_data.get('emergency'),
+            is_fresh=new_data.get('is_fresh'),
+            bad_gps=new_data.get('bad_gps'),
+            event_type='status_change'
+        )
     except Exception as e:
-        print(f"Error logging status change: {e}")
+        print(f"Error logging status change to SQLite: {e}")
 
 def initialize_log_files():
     try:
@@ -225,21 +210,27 @@ def initialize_log_files():
 
 def log_tak_forward(tag_id, tag, tak_cfg, cot_message: bytes):
     try:
-        with open(TAK_FORWARD_LOG_FILE, 'a') as f:
-            entry = {
-                'timestamp': datetime.now().isoformat(),
-                'tag_id': tag_id,
-                'ip': tak_cfg.get('ip'),
-                'port': tak_cfg.get('port'),
-                'send_interval': tak_cfg.get('send_interval'),
-                'latitude': tag.get('latitude'),
-                'longitude': tag.get('longitude'),
-                'battery_voltage': tag.get('battery_voltage'),
-                'cot_xml': cot_message.decode('utf-8', errors='replace')
-            }
-            f.write(json.dumps(entry) + '\n')
+        atos_sqlite.insert_tag_event(
+            timestamp=datetime.now().isoformat(),
+            tag_id=tag_id,
+            latitude=tag.get('latitude'),
+            longitude=tag.get('longitude'),
+            altitude_ft=tag.get('altitude_ft'),
+            battery_voltage=tag.get('battery_voltage'),
+            temperature=tag.get('temperature'),
+            pdop=tag.get('pdop'),
+            wire_status=tag.get('wire_status'),
+            object_status=tag.get('object_status'),
+            emergency=tag.get('emergency'),
+            is_fresh=tag.get('is_fresh'),
+            bad_gps=tag.get('bad_gps'),
+            tak_ip=tak_cfg.get('ip'),
+            tak_port=tak_cfg.get('port'),
+            cot_xml=cot_message.decode('utf-8', errors='replace'),
+            event_type='tak_forward'
+        )
     except Exception as e:
-        print(f"Error logging TAK forward: {e}")
+        print(f"Error logging TAK forward to SQLite: {e}")
 
 def log_tak_config_update():
     try:
@@ -943,6 +934,106 @@ def index():
 def display():
     return render_template('display.html')
 
+@app.route('/database')
+def database_page():
+    return render_template('database.html')
+
+@app.route('/api/db/tags')
+def api_db_tags():
+    # List all unique tag IDs in the database
+    with atos_sqlite.get_db() as conn:
+        rows = conn.execute('SELECT DISTINCT tag_id FROM tag_events WHERE tag_id IS NOT NULL ORDER BY tag_id').fetchall()
+        tag_ids = [row['tag_id'] for row in rows]
+    return jsonify(tag_ids)
+
+@app.route('/api/db/tag_data')
+def api_db_tag_data():
+    # Query: ?tag_id=1&start=...&end=...
+    tag_id = int(request.args.get('tag_id'))
+    start = request.args.get('start')
+    end = request.args.get('end')
+    q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
+    params = [tag_id]
+    if start:
+        q += ' AND timestamp >= ?'
+        params.append(start)
+    if end:
+        q += ' AND timestamp <= ?'
+        params.append(end)
+    q += ' ORDER BY timestamp'
+    with atos_sqlite.get_db() as conn:
+        rows = conn.execute(q, params).fetchall()
+        data = [{'timestamp': row['timestamp'], 'altitude_ft': row['altitude_ft']} for row in rows]
+    return jsonify(data)
+
+@app.route('/api/db/export_csv')
+def api_db_export_csv():
+    tag_id = int(request.args.get('tag_id'))
+    start = request.args.get('start')
+    end = request.args.get('end')
+    q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
+    params = [tag_id]
+    if start:
+        q += ' AND timestamp >= ?'
+        params.append(start)
+    if end:
+        q += ' AND timestamp <= ?'
+        params.append(end)
+    q += ' ORDER BY timestamp'
+    with atos_sqlite.get_db() as conn:
+        rows = conn.execute(q, params).fetchall()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['timestamp', 'altitude_ft'])
+    for row in rows:
+        writer.writerow([row['timestamp'], row['altitude_ft']])
+    output.seek(0)
+    filename = f"tag_{tag_id}_{start or 'all'}_{end or 'all'}.csv"
+    response = make_response(output.read())
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+    response.headers['Content-Type'] = 'text/csv'
+    return response
+
+@app.route('/api/db/export_kml')
+def api_db_export_kml():
+    tag_id = int(request.args.get('tag_id'))
+    start = request.args.get('start')
+    end = request.args.get('end')
+    q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
+    params = [tag_id]
+    if start:
+        q += ' AND timestamp >= ?'
+        params.append(start)
+    if end:
+        q += ' AND timestamp <= ?'
+        params.append(end)
+    q += ' ORDER BY timestamp'
+    with atos_sqlite.get_db() as conn:
+        rows = conn.execute(q, params).fetchall()
+    coords = '\n'.join(f"{row['longitude']},{row['latitude']},{row['altitude_ft']}" for row in rows)
+    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Tag {tag_id} Track</name>
+    <Placemark>
+      <name>Tag {tag_id} Path</name>
+      <LineString>
+        <extrude>1</extrude>
+        <tessellate>1</tessellate>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates>
+{coords}
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>'''
+    filename = f"tag_{tag_id}_{start or 'all'}_{end or 'all'}.kml"
+    response = make_response(kml)
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+    response.headers['Content-Type'] = 'application/vnd.google-earth.kml+xml'
+    return response
+
 # ==== Signal handling ====
 def signal_handler(sig, frame):
     print("\n🛑 Shutting down High-Volume ATOS TAK Forwarder...")
@@ -1004,4 +1095,5 @@ def main():
         signal_handler(signal.SIGINT, None)
 
 if __name__ == '__main__':
+    atos_sqlite.init_db()
     main() 
