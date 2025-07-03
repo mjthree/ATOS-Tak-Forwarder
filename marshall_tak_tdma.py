@@ -962,11 +962,13 @@ def api_db_tag_data():
             with atos_sqlite.get_db() as conn:
                 row = conn.execute('SELECT MAX(timestamp) as max_ts FROM tag_events WHERE tag_id=?', (tag_id,)).fetchone()
                 latest_ts = row['max_ts'] if row and row['max_ts'] else None
+            print(f"[DEBUG] Latest timestamp for tag {tag_id}: {latest_ts}")
             if latest_ts:
                 # Parse latest_ts as datetime
                 latest_dt = dateparser.parse(latest_ts)
                 start_dt = latest_dt - timedelta(minutes=minutes)
                 start = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[DEBUG] Calculated start time for {minutes} minutes: {start}")
             else:
                 start = None
         except Exception as e:
@@ -981,6 +983,7 @@ def api_db_tag_data():
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
         data = [{'timestamp': row['timestamp'], 'altitude_ft': row['altitude_ft']} for row in rows]
+    print(f"[DEBUG] Query returned {len(data)} rows for tag {tag_id}")
     return jsonify(data)
 
 @app.route('/api/db/export_csv')
