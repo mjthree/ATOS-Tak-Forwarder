@@ -24,6 +24,9 @@
 <div class="container">
     <label for="tag-select">Select Tag:</label>
     <select id="tag-select"></select>
+    <label for="minutes-back" style="margin-left:20px;">Previous minutes:</label>
+    <input type="number" id="minutes-back" value="30" min="1" style="width:70px;">
+    <button id="minutes-submit">Submit</button>
     <div id="slider"></div>
     <div id="chart-container">
         <canvas id="altitude-chart" height="300"></canvas>
@@ -53,6 +56,7 @@ let sliderRange = [0, 0];
 let sliderTimestamps = [];
 let sliderReady = false;
 let dataReady = false;
+let minutesBack = 30;
 
 function fetchTags() {
     fetch('/api/db/tags').then(r => r.json()).then(tags => {
@@ -67,14 +71,16 @@ function fetchTags() {
         });
         if (tags.length > 0) {
             sel.value = tags[0];
-            fetchTagData(tags[0]);
+            fetchTagData(tags[0], minutesBack);
         }
     });
 }
 
-function fetchTagData(tagId) {
+function fetchTagData(tagId, minutes) {
     dataReady = false;
-    fetch(`/api/db/tag_data?tag_id=${tagId}`)
+    let url = `/api/db/tag_data?tag_id=${tagId}`;
+    if (minutes) url += `&minutes=${minutes}`;
+    fetch(url)
         .then(r => r.json())
         .then(data => {
             tagData = data;
@@ -85,7 +91,13 @@ function fetchTagData(tagId) {
 }
 
 document.getElementById('tag-select').onchange = function() {
-    fetchTagData(this.value);
+    fetchTagData(this.value, minutesBack);
+};
+
+document.getElementById('minutes-submit').onclick = function() {
+    minutesBack = parseInt(document.getElementById('minutes-back').value) || 30;
+    const tagId = document.getElementById('tag-select').value;
+    fetchTagData(tagId, minutesBack);
 };
 
 function drawChart() {
