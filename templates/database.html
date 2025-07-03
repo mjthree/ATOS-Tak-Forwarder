@@ -90,6 +90,8 @@ function drawChart() {
     if (chart) { chart.destroy(); chart = null; }
     const labels = tagData.map(d => d.timestamp);
     const altitudes = tagData.map(d => Number(d.altitude_ft));
+    console.log('labels:', labels);
+    console.log('altitudes:', altitudes);
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -154,6 +156,8 @@ function zoomChartToSlider() {
     if (chart) { chart.destroy(); chart = null; }
     const labels = zoomedData.map(d => d.timestamp);
     const altitudes = zoomedData.map(d => Number(d.altitude_ft));
+    console.log('labels:', labels);
+    console.log('altitudes:', altitudes);
     const xMin = tagData[startIdx]?.timestamp || tagData[0].timestamp;
     const xMax = tagData[endIdx]?.timestamp || tagData[tagData.length-1].timestamp;
     chart = new Chart(ctx, {
