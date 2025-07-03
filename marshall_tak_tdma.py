@@ -999,6 +999,7 @@ def api_db_export_kml():
     tag_id = int(request.args.get('tag_id'))
     start = request.args.get('start')
     end = request.args.get('end')
+    color = request.args.get('color', 'ff0000ff')
     q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
     params = [tag_id]
     if start:
@@ -1010,21 +1011,24 @@ def api_db_export_kml():
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
-    coords = '\n'.join(f"{row['longitude']},{row['latitude']},{row['altitude_ft']}" for row in rows)
+    whens = '\n'.join(f"<when>{row['timestamp'].replace(' ','T')}Z</when>" for row in rows)
+    coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows)
     kml = f'''<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
-    <name>Tag {tag_id} Track</name>
+    <name>Tag {tag_id} Timed Track</name>
+    <Style id="trackStyle"><LineStyle><color>{color}</color><width>3</width></LineStyle><PolyStyle><color>7f00ff00</color></PolyStyle></Style>
     <Placemark>
-      <name>Tag {tag_id} Path</name>
-      <LineString>
-        <extrude>1</extrude>
-        <tessellate>1</tessellate>
-        <altitudeMode>absolute</altitudeMode>
-        <coordinates>
-{coords}
-        </coordinates>
-      </LineString>
+      <name>Tag {tag_id} Track</name>
+      <styleUrl>#trackStyle</styleUrl>
+      <gx:MultiTrack>
+        <gx:interpolate>1</gx:interpolate>
+        <gx:Track>
+          <gx:altitudeMode>absolute</gx:altitudeMode>
+          {whens}
+          {coords}
+        </gx:Track>
+      </gx:MultiTrack>
     </Placemark>
   </Document>
 </kml>'''

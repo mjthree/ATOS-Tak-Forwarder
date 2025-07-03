@@ -28,6 +28,17 @@
         <canvas id="altitude-chart" height="300"></canvas>
     </div>
     <div style="margin-top:20px;">
+        <label for="kml-color">KML Line Color:</label>
+        <select id="kml-color">
+            <option value="ff0000ff">Red</option>
+            <option value="ff00ff00">Green</option>
+            <option value="ffff0000">Blue</option>
+            <option value="ff00ffff">Yellow</option>
+            <option value="ffff00ff">Magenta</option>
+            <option value="ffffff00">Cyan</option>
+            <option value="ff000000">Black</option>
+            <option value="ffffffff">White</option>
+        </select>
         <button class="export-btn" id="export-csv">Export CSV</button>
         <button class="export-btn" id="export-kml">Export KML</button>
     </div>
@@ -140,7 +151,8 @@ document.getElementById('export-csv').onclick = function() {
 document.getElementById('export-kml').onclick = function() {
     const tagId = document.getElementById('tag-select').value;
     const [start, end] = getSliderTimeRange();
-    let url = `/api/db/export_kml?tag_id=${tagId}`;
+    const color = document.getElementById('kml-color').value;
+    let url = `/api/db/export_kml?tag_id=${tagId}&color=${color}`;
     if (start && end) url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
     window.open(url, '_blank');
 };
