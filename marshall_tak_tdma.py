@@ -960,7 +960,7 @@ def api_db_tag_data():
         try:
             minutes = int(minutes)
             from datetime import datetime, timedelta
-            now = datetime.utcnow()
+            now = datetime.now()
             start_dt = now - timedelta(minutes=minutes)
             # Format as string matching DB timestamp format (assume ISO or similar)
             start = start_dt.strftime('%Y-%m-%d %H:%M:%S')
