@@ -219,6 +219,10 @@ function getSliderTimeRange() {
     const [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
     const start = tagData[startIdx]?.timestamp;
     const end = tagData[endIdx]?.timestamp;
+    console.log('Slider:', slider, 'tagData.length:', tagData.length);
+    console.log('Slider get:', slider ? slider.noUiSlider.get() : null);
+    console.log('tagData[0]:', tagData[0], 'tagData[tagData.length-1]:', tagData[tagData.length-1]);
+    console.log('Computed start/end:', start, end);
     return [start, end];
 }
 
