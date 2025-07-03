@@ -1039,12 +1039,51 @@ def api_db_export_kml():
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
+    # Prepare coordinates for LineString (lon,lat,alt)
+    if dz_altitude is not None:
+        coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{max(0, row['altitude_ft'] - dz_altitude)}" for row in rows)
+    else:
+        coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{row['altitude_ft']}" for row in rows)
+    # (Optional) gx:Track for time-animated playback
     whens = '\n'.join(f"<when>{row['timestamp'].replace(' ','T')}Z</when>" for row in rows)
     if dz_altitude is not None:
-        coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {max(0, row['altitude_ft'] - dz_altitude)}</gx:coord>" for row in rows)
+        gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {max(0, row['altitude_ft'] - dz_altitude)}</gx:coord>" for row in rows)
     else:
-        coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows)
-    kml = f'''<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n  <Document>\n    <name>Tag {tag_id} Timed Track</name>\n    <Style id="trackStyle"><LineStyle><color>{color}</color><width>3</width></LineStyle><PolyStyle><color>7f00ff00</color></PolyStyle></Style>\n    <Placemark>\n      <name>Tag {tag_id} Track</name>\n      <styleUrl>#trackStyle</styleUrl>\n      <gx:MultiTrack>\n        <gx:interpolate>1</gx:interpolate>\n        <gx:Track>\n          <gx:altitudeMode>absolute</gx:altitudeMode>\n          {whens}\n          {coords}\n        </gx:Track>\n      </gx:MultiTrack>\n    </Placemark>\n  </Document>\n</kml>'''
+        gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows)
+    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <Style id="lineStyle">
+      <LineStyle>
+        <color>{color}</color>
+        <width>3</width>
+      </LineStyle>
+    </Style>
+    <Placemark>
+      <name>Tag {tag_id} Path</name>
+      <styleUrl>#lineStyle</styleUrl>
+      <LineString>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates>
+{coords3d}
+        </coordinates>
+      </LineString>
+    </Placemark>
+    <!-- Optional gx:Track for time-animated playback -->
+    <Placemark>
+      <name>Tag {tag_id} Timed Track</name>
+      <styleUrl>#lineStyle</styleUrl>
+      <gx:MultiTrack>
+        <gx:interpolate>1</gx:interpolate>
+        <gx:Track>
+          <gx:altitudeMode>absolute</gx:altitudeMode>
+          {whens}
+          {gx_coords}
+        </gx:Track>
+      </gx:MultiTrack>
+    </Placemark>
+  </Document>
+</kml>'''
     filename = f"tag_{tag_id}_{start or 'all'}_{end or 'all'}.kml"
     response = make_response(kml)
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
