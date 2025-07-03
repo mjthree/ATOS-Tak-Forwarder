@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATOS Database Explorer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/distribute/nouislider.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/distribute/nouislider.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.css">
     <style>
         body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
         .header{background:#2c3e50;color:#fff;padding:20px;margin:0 0 20px 0;}
@@ -85,7 +86,7 @@ document.getElementById('tag-select').onchange = function() {
 
 function drawChart() {
     const ctx = document.getElementById('altitude-chart').getContext('2d');
-    if (chart) chart.destroy();
+    if (chart) { chart.destroy(); chart = null; }
     const labels = tagData.map(d => d.timestamp);
     const altitudes = tagData.map(d => d.altitude_ft);
     chart = new Chart(ctx, {
