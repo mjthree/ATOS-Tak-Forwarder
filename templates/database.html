@@ -224,21 +224,35 @@ function getSliderTimeRange() {
 
 document.getElementById('export-csv').onclick = function() {
     const tagId = document.getElementById('tag-select').value;
+    if (!slider || tagData.length < 2) {
+        alert('Slider not ready or not enough data to export.');
+        return;
+    }
     const [start, end] = getSliderTimeRange();
+    if (!start || !end) {
+        alert('Unable to determine slider range for export.');
+        return;
+    }
     let url = `/api/db/export_csv?tag_id=${tagId}`;
-    if (start) url += `&start=${encodeURIComponent(start)}`;
-    if (end) url += `&end=${encodeURIComponent(end)}`;
+    url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
     console.log('Export CSV URL:', url);
     window.open(url, '_blank');
 };
 
 document.getElementById('export-kml').onclick = function() {
     const tagId = document.getElementById('tag-select').value;
+    if (!slider || tagData.length < 2) {
+        alert('Slider not ready or not enough data to export.');
+        return;
+    }
     const [start, end] = getSliderTimeRange();
+    if (!start || !end) {
+        alert('Unable to determine slider range for export.');
+        return;
+    }
     const color = document.getElementById('kml-color').value;
     let url = `/api/db/export_kml?tag_id=${tagId}&color=${color}`;
-    if (start) url += `&start=${encodeURIComponent(start)}`;
-    if (end) url += `&end=${encodeURIComponent(end)}`;
+    url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
     console.log('Export KML URL:', url);
     window.open(url, '_blank');
 };
