@@ -228,6 +228,7 @@ document.getElementById('export-csv').onclick = function() {
     let url = `/api/db/export_csv?tag_id=${tagId}`;
     if (start) url += `&start=${encodeURIComponent(start)}`;
     if (end) url += `&end=${encodeURIComponent(end)}`;
+    console.log('Export CSV URL:', url);
     window.open(url, '_blank');
 };
 
@@ -238,6 +239,7 @@ document.getElementById('export-kml').onclick = function() {
     let url = `/api/db/export_kml?tag_id=${tagId}&color=${color}`;
     if (start) url += `&start=${encodeURIComponent(start)}`;
     if (end) url += `&end=${encodeURIComponent(end)}`;
+    console.log('Export KML URL:', url);
     window.open(url, '_blank');
 };
 
