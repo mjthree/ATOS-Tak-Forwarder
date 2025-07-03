@@ -43,6 +43,8 @@
             <option value="ff000000">Black</option>
             <option value="ffffffff">White</option>
         </select>
+        <label for="dz-altitude" style="margin-left:20px;">DZ Altitude:</label>
+        <input type="number" id="dz-altitude" value="1893" min="0" style="width:80px;">
         <button class="export-btn" id="export-csv">Export CSV</button>
         <button class="export-btn" id="export-kml">Export KML</button>
     </div>
@@ -244,8 +246,9 @@ document.getElementById('export-csv').onclick = function() {
         alert('Unable to determine slider range for export.');
         return;
     }
+    const dzAltitude = parseFloat(document.getElementById('dz-altitude').value) || 0;
     let url = `/api/db/export_csv?tag_id=${tagId}`;
-    url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&dz_altitude=${dzAltitude}`;
     console.log('Export CSV URL:', url);
     window.open(url, '_blank');
 };
@@ -262,8 +265,9 @@ document.getElementById('export-kml').onclick = function() {
         return;
     }
     const color = document.getElementById('kml-color').value;
+    const dzAltitude = parseFloat(document.getElementById('dz-altitude').value) || 0;
     let url = `/api/db/export_kml?tag_id=${tagId}&color=${color}`;
-    url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&dz_altitude=${dzAltitude}`;
     console.log('Export KML URL:', url);
     window.open(url, '_blank');
 };
