@@ -25,6 +25,7 @@ import queue
 import atos_sqlite
 import io
 import csv
+from dateutil import parser as dateparser
 
 app = Flask(__name__)
 
@@ -953,28 +954,29 @@ def api_db_tag_data():
     if tag_id_param is None:
         return jsonify({'error': 'tag_id parameter is required'}), 400
     tag_id = int(tag_id_param)
-    start = request.args.get('start')
-    end = request.args.get('end')
     minutes = request.args.get('minutes')
     if minutes:
         try:
             minutes = int(minutes)
-            from datetime import datetime, timedelta
-            now = datetime.now()
-            start_dt = now - timedelta(minutes=minutes)
-            # Format as string matching DB timestamp format (assume ISO or similar)
-            start = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+            # Get the latest timestamp for this tag
+            with atos_sqlite.get_db() as conn:
+                row = conn.execute('SELECT MAX(timestamp) as max_ts FROM tag_events WHERE tag_id=?', (tag_id,)).fetchone()
+                latest_ts = row['max_ts'] if row and row['max_ts'] else None
+            if latest_ts:
+                # Parse latest_ts as datetime
+                latest_dt = dateparser.parse(latest_ts)
+                start_dt = latest_dt - timedelta(minutes=minutes)
+                start = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                start = None
         except Exception as e:
-            print(f"[ERROR] Invalid minutes param: {e}")
+            print(f"[ERROR] Invalid minutes param or timestamp parse: {e}")
             start = None
     q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
     params = [tag_id]
     if start is not None and start != '':
         q += ' AND timestamp >= ?'
         params.append(start)
-    if end is not None and end != '':
-        q += ' AND timestamp <= ?'
-        params.append(end)
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
