@@ -967,7 +967,7 @@ def api_db_tag_data():
                 # Parse latest_ts as datetime
                 latest_dt = dateparser.parse(latest_ts)
                 start_dt = latest_dt - timedelta(minutes=minutes)
-                start = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+                start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
                 print(f"[DEBUG] Calculated start time for {minutes} minutes: {start}")
             else:
                 start = None
