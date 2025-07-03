@@ -153,21 +153,16 @@ function zoomChartToSlider() {
     startIdx = Math.max(0, Math.min(startIdx, tagData.length - 1));
     endIdx = Math.max(0, Math.min(endIdx, tagData.length - 1));
     if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
-    // If slider is at full range, show all data
-    if (startIdx === 0 && endIdx === tagData.length - 1) {
-        drawChart();
-        return;
-    }
+    // Always set x-axis min/max to slider range, even if no data
+    const xMin = tagData[startIdx]?.timestamp || tagData[0].timestamp;
+    const xMax = tagData[endIdx]?.timestamp || tagData[tagData.length-1].timestamp;
     const zoomedData = tagData.slice(startIdx, endIdx + 1);
-    if (zoomedData.length === 0) return;
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
     const labels = zoomedData.map(d => d.timestamp);
     const altitudes = zoomedData.map(d => Number(d.altitude_ft));
     console.log('labels:', labels);
     console.log('altitudes:', altitudes);
-    const xMin = tagData[startIdx]?.timestamp || tagData[0].timestamp;
-    const xMax = tagData[endIdx]?.timestamp || tagData[tagData.length-1].timestamp;
     chart = new Chart(ctx, {
         type: 'line',
         data: {
