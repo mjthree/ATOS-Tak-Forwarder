@@ -92,7 +92,7 @@ def save_forwarding_config(cfg):
 
 def load_tak_config():
     if not os.path.exists(TAK_SERVER_CONFIG_FILE):
-        cfg = {'ip': '192.168.200.11', 'port': 8087, 'send_interval': 10, 'multicast_port': 6969}
+        cfg = {'ip': '192.168.200.11', 'port': 8087, 'send_interval': 10, 'multicast_port': 6969, 'tdma_interval': 10, 'disable_multicast': False}
         with open(TAK_SERVER_CONFIG_FILE, 'w') as f:
             json.dump(cfg, f, indent=2)
         return cfg
@@ -100,10 +100,13 @@ def load_tak_config():
         cfg = json.load(f)
     if 'send_interval' not in cfg:
         cfg['send_interval'] = 10
-        save_tak_config(cfg)
     if 'multicast_port' not in cfg:
         cfg['multicast_port'] = 6969
-        save_tak_config(cfg)
+    if 'tdma_interval' not in cfg:
+        cfg['tdma_interval'] = 10
+    if 'disable_multicast' not in cfg:
+        cfg['disable_multicast'] = False
+    save_tak_config(cfg)
     return cfg
 
 def save_tak_config(cfg):
@@ -622,6 +625,8 @@ def tag_scheduler_loop():
             time.sleep(0.1)
             continue
 
+        tdma_interval = tak_server_config.get('tdma_interval', 10)
+        per_tag_delay = tdma_interval / 100.0 if tdma_interval >= 3 else 0.03
         cycle_start = time.time()
         for tag_id in range(1, 101):
             with TAG_DATA_LOCK:
@@ -636,11 +641,11 @@ def tag_scheduler_loop():
                     callsign = cfg.get('callsign') or tag_id
                     tag_to_send['callsign'] = callsign
                     tak_client.send_batch([(tag_id, tag_to_send, callsign)], send_to_server=True, send_to_multicast=False)
-            time.sleep(0.05)
+            time.sleep(per_tag_delay)
 
         elapsed = time.time() - cycle_start
-        if elapsed < 10:
-            time.sleep(10 - elapsed)
+        if elapsed < tdma_interval:
+            time.sleep(tdma_interval - elapsed)
 
 def multicast_batch_loop():
     """Send a batch of all tags via multicast every configured interval"""
@@ -649,7 +654,8 @@ def multicast_batch_loop():
     while True:
         interval = tak_server_config.get('send_interval', 10)
         time.sleep(interval)
-
+        if tak_server_config.get('disable_multicast', False):
+            continue
         batch_messages = []
         with TAG_DATA_LOCK:
             tag_items = list(tag_data.items())
@@ -814,6 +820,17 @@ def api_tak_server():
             tak_server_config['send_interval'] = int(data.get('send_interval'))
         except (TypeError, ValueError):
             pass
+    if 'tdma_interval' in data:
+        try:
+            tak_server_config['tdma_interval'] = int(data.get('tdma_interval'))
+        except (TypeError, ValueError):
+            pass
+    if 'disable_multicast' in data:
+        val = data.get('disable_multicast')
+        if isinstance(val, str):
+            tak_server_config['disable_multicast'] = val.lower() in ('1', 'true', 'yes', 'on')
+        else:
+            tak_server_config['disable_multicast'] = bool(val)
     save_tak_config(tak_server_config)
     log_tak_config_update()
     return jsonify({'status': 'ok'})
