@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/c/Users/mike/OneDrive/Desktop/ATOS Tak Forwarder
+WorkingDirectory=/home/pi/ATOS-Tak-Forwarder
 ExecStart=/usr/bin/python3 marshall_tak_tdma.py
 Restart=always
 RestartSec=10
