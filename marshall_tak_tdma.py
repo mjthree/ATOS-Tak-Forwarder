@@ -27,6 +27,8 @@ import io
 import csv
 from dateutil import parser as dateparser
 import sqlite3
+from functools import wraps
+import hashlib
 
 app = Flask(__name__)
 
@@ -85,6 +87,43 @@ TAK_FORWARD_LOG_FILE = LOGS_DIR / f"tak_forwarding_{timestamp}.log"
 FORWARDING_CONFIG_FILE = 'forwarding_config.json'
 TAK_SERVER_CONFIG_FILE = 'tak_server_config.json'
 TEMPLATES_FILE = 'templates.json'
+
+ADMIN_PASSWORD_HASH = 'b1e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2'  # placeholder, will set real hash below
+
+# Set the real hash for 'apex123APEX!@#'
+def _get_admin_password_hash():
+    return hashlib.sha256('apex123APEX!@#'.encode('utf-8')).hexdigest()
+ADMIN_PASSWORD_HASH = _get_admin_password_hash()
+
+def check_admin_auth():
+    from flask import session, request
+    def check_hash(pw):
+        return hashlib.sha256(pw.encode('utf-8')).hexdigest() == ADMIN_PASSWORD_HASH
+    if session.get('admin_authenticated'):
+        return True
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        pw = data.get('admin_password')
+        if pw and check_hash(pw):
+            session['admin_authenticated'] = True
+            return True
+    if request.method == 'GET':
+        pw = request.args.get('admin_password')
+        if pw and check_hash(pw):
+            session['admin_authenticated'] = True
+            return True
+    return False
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        from flask import session, request, redirect, url_for, jsonify
+        if not check_admin_auth():
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Admin authentication required'}), 401
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated
 
 def load_forwarding_config():
     if not os.path.exists(FORWARDING_CONFIG_FILE):
@@ -1080,264 +1119,43 @@ def api_db_export_kml():
     response.headers['Content-Type'] = 'application/vnd.google-earth.kml+xml'
     return response
 
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    from flask import request, session, render_template_string, redirect, url_for
+    error = None
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password and hashlib.sha256(password.encode('utf-8')).hexdigest() == ADMIN_PASSWORD_HASH:
+            session['admin_authenticated'] = True
+            return redirect(url_for('admin_page'))
+        else:
+            error = 'Incorrect password.'
+    return render_template_string('''
+    <html><head><title>Admin Login</title></head><body style="font-family:sans-serif;background:#223366;color:#fff;text-align:center;padding-top:100px;">
+    <h2>Admin Login</h2>
+    {% if error %}<div style="color:#ff6666;">{{ error }}</div>{% endif %}
+    <form method="post">
+        <input type="password" name="password" placeholder="Admin Password" style="padding:10px;font-size:1.2em;" autofocus>
+        <button type="submit" style="padding:10px 20px;font-size:1.2em;">Login</button>
+    </form>
+    </body></html>
+    ''', error=error)
+
 @app.route('/admin')
+@admin_required
 def admin_page():
     return render_template('admin.html')
 
-@app.route('/api/admin/db_info')
-def api_admin_db_info():
-    """Get database information including size, record counts, etc."""
-    try:
-        with atos_sqlite.get_db() as conn:
-            # Get total record count
-            total_records = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
-            
-            # Get record count by tag_id (1-100 only)
-            tag_counts = {}
-            for tag_id in range(1, 101):
-                count = conn.execute('SELECT COUNT(*) as count FROM tag_events WHERE tag_id = ?', (tag_id,)).fetchone()['count']
-                if count > 0:
-                    tag_counts[tag_id] = count
-            
-            # Get date range
-            date_range = conn.execute('SELECT MIN(timestamp) as min_ts, MAX(timestamp) as max_ts FROM tag_events').fetchone()
-            
-            # Get database file size
-            db_path = atos_sqlite.get_db_path()
-            file_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-            
-            # Get archived databases
-            archive_dir = Path('database_archives')
-            archive_dir.mkdir(exist_ok=True)
-            archived_dbs = []
-            for db_file in archive_dir.glob('*.db'):
-                archived_dbs.append({
-                    'name': db_file.name,
-                    'size': os.path.getsize(db_file),
-                    'modified': datetime.fromtimestamp(os.path.getmtime(db_file)).isoformat()
-                })
-            
-            return jsonify({
-                'total_records': total_records,
-                'tag_counts': tag_counts,
-                'date_range': {
-                    'min': date_range['min_ts'],
-                    'max': date_range['max_ts']
-                },
-                'file_size': file_size,
-                'archived_databases': archived_dbs
-            })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Protect all admin API endpoints
+def protect_admin_api():
+    from flask import request
+    if not check_admin_auth():
+        return jsonify({'error': 'Admin authentication required'}), 401
 
-@app.route('/api/admin/download_db')
-def api_admin_download_db():
-    """Download the current SQLite database"""
-    try:
-        db_path = atos_sqlite.get_db_path()
-        if not os.path.exists(db_path):
-            return jsonify({'error': 'Database file not found'}), 404
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f'atos_events_{timestamp}.db'
-        
-        return send_file(
-            db_path,
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/x-sqlite3'
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/archive_db', methods=['POST'])
-def api_admin_archive_db():
-    print('[ADMIN] Archive DB: Starting archive operation')
-    try:
-        db_path = atos_sqlite.get_db_path()
-        if not os.path.exists(db_path):
-            print('[ADMIN] Archive DB: Database file not found')
-            return jsonify({'error': 'Database file not found'}), 404
-        
-        archive_dir = Path('database_archives')
-        archive_dir.mkdir(exist_ok=True)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        archive_path = archive_dir / f'atos_events_archive_{timestamp}.db'
-        import shutil
-        shutil.copy2(db_path, archive_path)
-        print(f'[ADMIN] Archive DB: Copied to {archive_path}')
-        with atos_sqlite.get_db() as conn:
-            record_count = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
-        with atos_sqlite.get_db() as conn:
-            conn.execute('DELETE FROM tag_events')
-            conn.commit()
-        print(f'[ADMIN] Archive DB: Cleared {record_count} records from current DB')
-        return jsonify({
-            'success': True,
-            'message': f'Database archived with {record_count} records',
-            'archive_file': archive_path.name,
-            'archive_size': os.path.getsize(archive_path)
-        })
-    except Exception as e:
-        print(f'[ADMIN] Archive DB: ERROR: {e}')
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/download_archive/<filename>')
-def api_admin_download_archive(filename):
-    """Download an archived database"""
-    try:
-        archive_path = Path('database_archives') / filename
-        if not archive_path.exists():
-            return jsonify({'error': 'Archive file not found'}), 404
-        
-        return send_file(
-            archive_path,
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/x-sqlite3'
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/load_archive', methods=['POST'])
-def api_admin_load_archive():
-    print('[ADMIN] Load Archive: Starting load operation')
-    try:
-        data = request.get_json()
-        filename = data.get('filename')
-        action = data.get('action')
-        print(f'[ADMIN] Load Archive: filename={filename}, action={action}')
-        if not filename or action not in ['merge', 'overwrite']:
-            print('[ADMIN] Load Archive: Invalid parameters')
-            return jsonify({'error': 'Invalid parameters'}), 400
-        archive_path = Path('database_archives') / filename
-        if not archive_path.exists():
-            print('[ADMIN] Load Archive: Archive file not found')
-            return jsonify({'error': 'Archive file not found'}), 404
-        current_db_path = atos_sqlite.get_db_path()
-        if action == 'overwrite':
-            # Archive current DB before overwrite
-            archive_dir = Path('database_archives')
-            archive_dir.mkdir(exist_ok=True)
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_path = archive_dir / f'atos_events_overwrite_backup_{timestamp}.db'
-            import shutil
-            shutil.copy2(current_db_path, backup_path)
-            shutil.copy2(archive_path, current_db_path)
-            print(f'[ADMIN] Load Archive: Overwrote current DB with {archive_path}, backup at {backup_path}')
-            return jsonify({
-                'success': True,
-                'message': f'Database overwritten with archive: {filename}',
-                'backup_created': backup_path.name
-            })
-        elif action == 'merge':
-            # Schema-aware merge
-            with sqlite3.connect(current_db_path) as current_conn, sqlite3.connect(archive_path) as archive_conn:
-                # Get column names for both tables
-                current_cols = [row[1] for row in current_conn.execute("PRAGMA table_info(tag_events)").fetchall()]
-                archive_cols = [row[1] for row in archive_conn.execute("PRAGMA table_info(tag_events)").fetchall()]
-                # Use only columns present in both
-                common_cols = [col for col in archive_cols if col in current_cols]
-                print(f'[ADMIN] Load Archive: Common columns: {common_cols}')
-                # Build SELECT and INSERT statements
-                select_sql = f"SELECT {', '.join(common_cols)} FROM tag_events"
-                insert_sql = f"INSERT OR IGNORE INTO tag_events ({', '.join(common_cols)}) VALUES ({', '.join(['?']*len(common_cols))})"
-                archive_data = archive_conn.execute(select_sql).fetchall()
-                print(f'[ADMIN] Load Archive: Merging {len(archive_data)} records from archive')
-                cursor = current_conn.cursor()
-                for row in archive_data:
-                    try:
-                        cursor.execute(insert_sql, row)
-                    except Exception as row_e:
-                        print(f'[ADMIN] Load Archive: ERROR inserting row: {row_e}')
-                current_conn.commit()
-                merged_count = cursor.rowcount
-            print(f'[ADMIN] Load Archive: Merge complete, merged_count={merged_count}')
-            return jsonify({
-                'success': True,
-                'message': f'Merged {merged_count} records from archive: {filename}'
-            })
-    except Exception as e:
-        print(f'[ADMIN] Load Archive: ERROR: {e}')
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/clear_old_data', methods=['POST'])
-def api_admin_clear_old_data():
-    print('[ADMIN] Clear Old Data: Starting clear operation')
-    try:
-        data = request.get_json()
-        days = data.get('days', 30)
-        if not isinstance(days, int) or days < 1:
-            print('[ADMIN] Clear Old Data: Invalid days parameter')
-            return jsonify({'error': 'Days must be a positive integer'}), 400
-        cutoff_date = datetime.now() - timedelta(days=days)
-        cutoff_str = cutoff_date.isoformat()
-        with atos_sqlite.get_db() as conn:
-            count_before = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
-            cursor = conn.execute('DELETE FROM tag_events WHERE timestamp < ?', (cutoff_str,))
-            deleted_count = cursor.rowcount
-            count_after = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
-            conn.commit()
-        print(f'[ADMIN] Clear Old Data: Deleted {deleted_count} records older than {days} days')
-        return jsonify({
-            'success': True,
-            'message': f'Deleted {deleted_count} records older than {days} days',
-            'records_before': count_before,
-            'records_after': count_after,
-            'cutoff_date': cutoff_str
-        })
-    except Exception as e:
-        print(f'[ADMIN] Clear Old Data: ERROR: {e}')
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/clear_db')
-def api_admin_clear_db():
-    print('[ADMIN] Clear DB: Starting clear operation')
-    try:
-        with atos_sqlite.get_db() as conn:
-            count_before = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
-            conn.execute('DELETE FROM tag_events')
-            conn.commit()
-        print(f'[ADMIN] Clear DB: Cleared {count_before} records')
-        return jsonify({
-            'success': True,
-            'message': f'Cleared {count_before} records from database'
-        })
-    except Exception as e:
-        print(f'[ADMIN] Clear DB: ERROR: {e}')
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/cleanup_invalid_tags')
-def api_admin_cleanup_invalid_tags():
-    print('[ADMIN] Cleanup Invalid Tags: Starting cleanup operation')
-    try:
-        with atos_sqlite.get_db() as conn:
-            invalid_count = conn.execute('SELECT COUNT(*) as count FROM tag_events WHERE tag_id < 1 OR tag_id > 100').fetchone()['count']
-            conn.execute('DELETE FROM tag_events WHERE tag_id < 1 OR tag_id > 100')
-            conn.commit()
-        print(f'[ADMIN] Cleanup Invalid Tags: Removed {invalid_count} records')
-        return jsonify({
-            'success': True,
-            'message': f'Removed {invalid_count} records from invalid tag IDs (outside 1-100 range)'
-        })
-    except Exception as e:
-        print(f'[ADMIN] Cleanup Invalid Tags: ERROR: {e}')
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/delete_archive/<filename>', methods=['DELETE'])
-def api_admin_delete_archive(filename):
-    print(f'[ADMIN] Delete Archive: Attempting to delete {filename}')
-    try:
-        archive_path = Path('database_archives') / filename
-        if not archive_path.exists():
-            print('[ADMIN] Delete Archive: File not found')
-            return jsonify({'error': 'Archive file not found'}), 404
-        archive_path.unlink()
-        print(f'[ADMIN] Delete Archive: Deleted {filename}')
-        return jsonify({'success': True, 'message': f'Archive {filename} deleted.'})
-    except Exception as e:
-        print(f'[ADMIN] Delete Archive: ERROR: {e}')
-        return jsonify({'error': str(e)}), 500
+for rule in list(app.url_map.iter_rules()):
+    if rule.rule.startswith('/api/admin/'):
+        view_func = app.view_functions[rule.endpoint]
+        app.view_functions[rule.endpoint] = admin_required(view_func)
 
 # ==== Signal handling ====
 def signal_handler(sig, frame):
