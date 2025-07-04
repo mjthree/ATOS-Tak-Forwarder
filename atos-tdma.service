@@ -1,5 +1,5 @@
 [Unit]
-Description=ATOS TAK Forwarder TDMA Version (Testing)
+Description=APEX SHIELD - ATOS TAK Forwarder TDMA Version
 After=network.target
 
 [Service]

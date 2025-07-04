@@ -3,23 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATOS Database Explorer</title>
+    <title>APEX SHIELD - ATOS TAK Forwarder - Database Interface</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.css">
     <style>
         body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
+        .nav-bar{background:#34495e;color:#fff;padding:10px 20px;margin:0 0 20px 0;}
+        .nav-bar a{color:#fff;text-decoration:none;padding:10px 15px;margin:0 5px;border-radius:5px;transition:background 0.3s;}
+        .nav-bar a:hover{background:#2c3e50;}
+        .nav-bar a.active{background:#2c3e50;font-weight:bold;}
         .header{background:#2c3e50;color:#fff;padding:20px;margin:0 0 20px 0;}
         .container{max-width:900px;margin:0 auto;padding:20px;}
         #chart-container{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 8px #0001;}
         #slider{margin:30px 0;}
         .export-btn{margin-right:10px;}
+        .company-brand{font-size:0.9em;opacity:0.8;margin-top:5px;}
     </style>
 </head>
 <body>
+<div class="nav-bar">
+    <a href="/">🏠 Main Control</a>
+    <a href="/display">📊 Display Dashboard</a>
+    <a href="/database" class="active">📈 Database Interface</a>
+</div>
 <div class="header">
-    <h1>📊 ATOS Database Explorer</h1>
+    <h1>📊 APEX SHIELD - ATOS Database Explorer</h1>
+    <div class="company-brand">Historical Data Analysis & Export</div>
 </div>
 <div class="container">
     <label for="tag-select">Select Tag:</label>

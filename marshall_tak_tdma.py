@@ -679,10 +679,16 @@ def serial_reader():
         try:
             print("🚀 Attempting to connect to /dev/ttyACM0...")
             ser = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1)
-            ser.setDTR(True)
-            ser.setRTS(True)
-            ser.flushInput()
-            ser.flushOutput()
+            # Note: setDTR, setRTS, flushInput, flushOutput are deprecated but still work
+            # They're used for compatibility with older serial libraries
+            try:
+                ser.setDTR(True)
+                ser.setRTS(True)
+                ser.flushInput()
+                ser.flushOutput()
+            except AttributeError:
+                # These methods might not be available in all pyserial versions
+                pass
             stats['connected'] = True
             stats['error'] = None
             print("✅ Connected to /dev/ttyACM0")
@@ -771,8 +777,8 @@ def api_tags():
         t['forward'] = cfg.get('forward', forwarding_config.get('forward_all', False))
         callsign = cfg.get('callsign')
         if not callsign:
-            callsign = tag_id
-        t['callsign'] = callsign
+            callsign = str(tag_id)
+        t['callsign'] = str(callsign)
         t['color'] = cfg.get('color', 'white')
         t['track_type'] = cfg.get('track_type', 'PAX')
         result[tag_id] = t
@@ -978,7 +984,7 @@ def api_db_tag_data():
     params = [tag_id]
     if start is not None and start != '':
         q += ' AND timestamp >= ?'
-        params.append(start)
+        params.append(str(start))
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
@@ -988,7 +994,10 @@ def api_db_tag_data():
 
 @app.route('/api/db/export_csv')
 def api_db_export_csv():
-    tag_id = int(request.args.get('tag_id'))
+    tag_id_param = request.args.get('tag_id')
+    if tag_id_param is None:
+        return jsonify({'error': 'tag_id parameter is required'}), 400
+    tag_id = int(tag_id_param)
     start = request.args.get('start')
     end = request.args.get('end')
     dz_altitude = request.args.get('dz_altitude', type=float)
@@ -996,10 +1005,10 @@ def api_db_export_csv():
     params = [tag_id]
     if start:
         q += ' AND timestamp >= ?'
-        params.append(start)
+        params.append(str(start))
     if end:
         q += ' AND timestamp <= ?'
-        params.append(end)
+        params.append(str(end))
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
@@ -1023,7 +1032,10 @@ def api_db_export_csv():
 
 @app.route('/api/db/export_kml')
 def api_db_export_kml():
-    tag_id = int(request.args.get('tag_id'))
+    tag_id_param = request.args.get('tag_id')
+    if tag_id_param is None:
+        return jsonify({'error': 'tag_id parameter is required'}), 400
+    tag_id = int(tag_id_param)
     start = request.args.get('start')
     end = request.args.get('end')
     color = request.args.get('color', 'ff0000ff')
@@ -1032,10 +1044,10 @@ def api_db_export_kml():
     params = [tag_id]
     if start is not None and start != '':
         q += ' AND timestamp >= ?'
-        params.append(start)
+        params.append(str(start))
     if end is not None and end != '':
         q += ' AND timestamp <= ?'
-        params.append(end)
+        params.append(str(end))
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
@@ -1099,15 +1111,18 @@ def signal_handler(sig, frame):
 
 # ==== Main function ====
 def main():
-    print("🚀 ATOS TAK Forwarder - TDMA Version")
+    print("🚀 APEX SHIELD - ATOS TAK Forwarder - TDMA Version")
     print("🔧 Deterministic tag scheduler with multicast batching")
-    print("=" * 60)
+    print("=" * 70)
+    print("🏢 Company: APEX SHIELD")
+    print("📡 System: ATOS Tag Tracking & TAK Integration")
     print("📊 Optimizations: Queue-based processing, UDP batching, efficient memory")
     print("🎯 Target: 100+ devices with high packet rates")
     print("⚡ Performance: Optimized for high-volume operations")
     print("💾 Memory: Efficient queues and data structures")
     print("🌐 Web interface: http://localhost:5000")
     print("📊 Dashboard: http://localhost:5000/display")
+    print("📈 Database: http://localhost:5000/database")
     print("📈 Performance stats: http://localhost:5000/api/stats")
     
     signal.signal(signal.SIGINT, signal_handler)

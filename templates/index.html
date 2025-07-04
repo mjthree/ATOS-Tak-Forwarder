@@ -3,20 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATOS Forwarder</title>
+    <title>APEX SHIELD - ATOS TAK Forwarder - Main Control</title>
     <style>
         body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
+        .nav-bar{background:#34495e;color:#fff;padding:10px 20px;margin:0 0 20px 0;}
+        .nav-bar a{color:#fff;text-decoration:none;padding:10px 15px;margin:0 5px;border-radius:5px;transition:background 0.3s;}
+        .nav-bar a:hover{background:#2c3e50;}
+        .nav-bar a.active{background:#2c3e50;font-weight:bold;}
         .header{background:#2c3e50;color:#fff;padding:20px;margin:0 0 20px 0;}
         .container{max-width:1200px;margin:0 auto;padding:20px;}
         table{width:100%;border-collapse:collapse;background:#fff;}
         th,td{padding:8px;border-bottom:1px solid #ddd;}
         th{background:#34495e;color:#fff;}
         .stale-row{opacity:0.5;background:#f8f9fa;}
+        .company-brand{font-size:0.9em;opacity:0.8;margin-top:5px;}
     </style>
 </head>
 <body>
+<div class="nav-bar">
+    <a href="/" class="active">🏠 Main Control</a>
+    <a href="/display">📊 Display Dashboard</a>
+    <a href="/database">📈 Database Interface</a>
+</div>
 <div class="header">
-    <h1>🚀 ATOS Forwarder</h1>
+    <h1>🚀 APEX SHIELD - ATOS TAK Forwarder</h1>
+    <div class="company-brand">Main Control Interface</div>
     <div>
         TAK Server: <input id="tak-ip" size="15"> : <input id="tak-port" size="5">
         Interval:
@@ -111,77 +122,77 @@ function updateTable(tags){
     const lat = tag.latitude!==undefined ? tag.latitude.toFixed(6) : 'N/A';
     const lon = tag.longitude!==undefined ? tag.longitude.toFixed(6) : 'N/A';
     let latCell = lat;
-    let lonCell = lon;
-    if(lat !== 'N/A' && lon !== 'N/A') {
-      const url = `https://www.google.com/maps?q=${lat},${lon}`;
-      latCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lat}</a>`;
-      lonCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lon}</a>`;
+          let lonCell = lon;
+      if(lat !== 'N/A' && lon !== 'N/A') {
+        const url = `https://www.google.com/maps?q=${lat},${lon}`;
+        latCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lat}</a>`;
+        lonCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lon}</a>`;
+      }
+      tr.innerHTML = `<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.bad_gps?'Bad':'Good'}</td><td>${latCell}</td><td>${lonCell}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp?tag.timestamp.slice(0,8):'N/A'}</td>`;
+      const f=document.createElement('td');
+      const chk=document.createElement('input');
+      chk.type='checkbox';chk.checked=tag.forward;
+      chk.onchange=()=>{fetch(`/api/tag/${id}/forward`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward:chk.checked})});};
+      f.appendChild(chk);
+      tr.appendChild(f);
+      const colorTd = document.createElement('td');
+      colorTd.appendChild(createColorDropdown(tag.color||'white', id));
+      tr.appendChild(colorTd);
+      const trackTypeTd = document.createElement('td');
+              trackTypeTd.appendChild(createTrackTypeDropdown(tag.track_type||'PAX', id));
+      tr.appendChild(trackTypeTd);
+      const c=document.createElement('td');
+      const inp=document.createElement('input');
+      inp.value=tag.callsign||`Tag${id}`;
+      inp.readOnly=true;
+      const editBtn=document.createElement('button');
+      editBtn.textContent='Edit';
+      const saveBtn=document.createElement('button');
+      saveBtn.textContent='Save';
+      saveBtn.style.display='none';
+      editBtn.onclick=()=>{isEditing=true;stopAutoRefresh();inp.readOnly=false;editBtn.style.display='none';saveBtn.style.display='inline';};
+      saveBtn.onclick=()=>{fetch(`/api/tag/${id}/callsign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callsign:inp.value})}).then(()=>{inp.readOnly=true;editBtn.style.display='inline';saveBtn.style.display='none';isEditing=false;startAutoRefresh();});};
+      c.appendChild(inp);c.appendChild(editBtn);c.appendChild(saveBtn);tr.appendChild(c);
+      tbody.appendChild(tr);
     }
-    tr.innerHTML = `<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.bad_gps?'Bad':'Good'}</td><td>${latCell}</td><td>${lonCell}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp?tag.timestamp.slice(0,8):'N/A'}</td>`;
-    const f=document.createElement('td');
-    const chk=document.createElement('input');
-    chk.type='checkbox';chk.checked=tag.forward;
-    chk.onchange=()=>{fetch(`/api/tag/${id}/forward`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward:chk.checked})});};
-    f.appendChild(chk);
-    tr.appendChild(f);
-    const colorTd = document.createElement('td');
-    colorTd.appendChild(createColorDropdown(tag.color||'white', id));
-    tr.appendChild(colorTd);
-    const trackTypeTd = document.createElement('td');
-            trackTypeTd.appendChild(createTrackTypeDropdown(tag.track_type||'PAX', id));
-    tr.appendChild(trackTypeTd);
-    const c=document.createElement('td');
-    const inp=document.createElement('input');
-    inp.value=tag.callsign||`Tag${id}`;
-    inp.readOnly=true;
-    const editBtn=document.createElement('button');
-    editBtn.textContent='Edit';
-    const saveBtn=document.createElement('button');
-    saveBtn.textContent='Save';
-    saveBtn.style.display='none';
-    editBtn.onclick=()=>{isEditing=true;stopAutoRefresh();inp.readOnly=false;editBtn.style.display='none';saveBtn.style.display='inline';};
-    saveBtn.onclick=()=>{fetch(`/api/tag/${id}/callsign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callsign:inp.value})}).then(()=>{inp.readOnly=true;editBtn.style.display='inline';saveBtn.style.display='none';isEditing=false;startAutoRefresh();});};
-    c.appendChild(inp);c.appendChild(editBtn);c.appendChild(saveBtn);tr.appendChild(c);
-    tbody.appendChild(tr);
   }
-}
-function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);}
-function fetchConfigs(){
-  fetch('/api/tak_server').then(r=>r.json()).then(d=>{
-    document.getElementById('tak-ip').value=d.ip;
-    document.getElementById('tak-port').value=d.port;
-    document.getElementById('multicast-port').value=d.multicast_port||6969;
-    document.getElementById('tdma-interval').value=d.send_interval||10;
-    document.getElementById('disable-multicast').checked = !!d.disable_multicast;
-  });
-  fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
-  fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
-}
-function updateTak(){
-  const ip=document.getElementById('tak-ip').value;
-  const port=document.getElementById('tak-port').value;
-  const multicast_port=document.getElementById('multicast-port').value;
-  const tdma_interval=document.getElementById('tdma-interval').value;
-  const disable_multicast=document.getElementById('disable-multicast').checked;
-  fetch('/api/tak_server',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ip,port,multicast_port,tdma_interval,disable_multicast})
-  });
-}
- document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
-function saveTemplate(){const name=document.getElementById('template-name').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',name})}).then(fetchConfigs);}
-function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
-function deleteTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})}).then(fetchConfigs);}
-function renameTemplate(){const name=document.getElementById('templates').value;const newName=document.getElementById('template-name').value;if(!name||!newName)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rename',name,new_name:newName})}).then(fetchConfigs);}
-document.getElementById('reset-tags-btn').onclick = function() {
-  if(confirm('WARNING: This will reset ALL tags to white and callsigns to their tag number. This cannot be undone. Are you sure?')) {
-    fetch('/api/reset_tags', {method:'POST'})
-      .then(r=>r.json())
-      .then(()=>{fetchTags();});
+  function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);}
+  function fetchConfigs(){
+    fetch('/api/tak_server').then(r=>r.json()).then(d=>{
+      document.getElementById('tak-ip').value=d.ip;
+      document.getElementById('tak-port').value=d.port;
+      document.getElementById('multicast-port').value=d.multicast_port||6969;
+      document.getElementById('tdma-interval').value=d.send_interval||10;
+      document.getElementById('disable-multicast').checked = !!d.disable_multicast;
+    });
+    fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
+    fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
   }
-};
-fetchConfigs();fetchTags();startAutoRefresh();
-</script>
-</body>
-</html>
+  function updateTak(){
+    const ip=document.getElementById('tak-ip').value;
+    const port=document.getElementById('tak-port').value;
+    const multicast_port=document.getElementById('multicast-port').value;
+    const tdma_interval=document.getElementById('tdma-interval').value;
+    const disable_multicast=document.getElementById('disable-multicast').checked;
+    fetch('/api/tak_server',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ip,port,multicast_port,tdma_interval,disable_multicast})
+    });
+  }
+   document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
+  function saveTemplate(){const name=document.getElementById('template-name').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',name})}).then(fetchConfigs);}
+  function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
+  function deleteTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})}).then(fetchConfigs);}
+  function renameTemplate(){const name=document.getElementById('templates').value;const newName=document.getElementById('template-name').value;if(!name||!newName)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rename',name,new_name:newName})}).then(fetchConfigs);}
+  document.getElementById('reset-tags-btn').onclick = function() {
+    if(confirm('WARNING: This will reset ALL tags to white and callsigns to their tag number. This cannot be undone. Are you sure?')) {
+      fetch('/api/reset_tags', {method:'POST'})
+        .then(r=>r.json())
+        .then(()=>{fetchTags();});
+    }
+  };
+  fetchConfigs();fetchTags();startAutoRefresh();
+  </script>
+  </body>
+  </html>

@@ -1,23 +1,26 @@
-# ATOS TAK Forwarder - High-Volume Tracker System
+# APEX SHIELD - ATOS TAK Forwarder - TDMA Version
 
-A comprehensive system for forwarding ATOS tracker data to TAK servers with real-time web dashboard monitoring. Designed to handle 100+ devices with optimized performance, multicast support, and advanced rate limiting.
+A comprehensive system for forwarding ATOS tracker data to TAK servers with real-time web dashboard monitoring. Features deterministic TDMA scheduling for reliable tag transmission and multicast support for ATAK compatibility.
+
+**Company:** APEX SHIELD  
+**System:** ATOS Tag Tracking & TAK Integration
 
 ## 🚀 Features
 
 ### Core Functionality
-- **High-Volume Processing:** Optimized for 100+ ATOS trackers simultaneously
-- **TAK Server Integration:** Forwards COT messages to TAK servers via UDP/TCP
+- **TDMA Scheduling:** Deterministic tag transmission with configurable intervals
+- **TAK Server Integration:** Forwards COT messages to TAK servers via UDP
 - **Multicast Support:** Broadcasts to UDP 6969 for ATAK compatibility
 - **Real-time Web Dashboard:** Live monitoring with 10x10 grid display
-- **Queue-based Processing:** Efficient packet handling with threading
-- **Rate Limiting:** Per-tag rate limiting to prevent spam (like ATOS plugin)
+- **Database Integration:** SQLite storage for historical data and analysis
+- **Rate Limiting:** Per-tag rate limiting to prevent spam
 - **Service Mode:** Runs as systemd service on Raspberry Pi
 
-### Web Interface
-- **Main Dashboard:** `http://[PI_IP]:5000/display` - Clean 10x10 grid for wall mounting
-- **Control Interface:** `http://[PI_IP]:5000/` - Full configuration and monitoring
+### Web Interface Sites
+- **Main Control:** `http://[PI_IP]:5000/` - Full configuration and monitoring interface
+- **Display Dashboard:** `http://[PI_IP]:5000/display` - Clean 10x10 grid for wall mounting
+- **Database Interface:** `http://[PI_IP]:5000/database` - Historical data analysis and export
 - **API Endpoints:** RESTful API for programmatic access
-- **Real-time Updates:** Auto-refreshing data every 2 seconds
 
 ### Track Type Support
 - **PAX** → Personnel (person icon in ATAK)
@@ -42,7 +45,7 @@ A comprehensive system for forwarding ATOS tracker data to TAK servers with real
 ## 📋 Prerequisites
 
 ### Hardware Requirements
-- **Raspberry Pi** (3B+ or 4 recommended for 100+ devices)
+- **Raspberry Pi** (3B+ or 4 recommended)
 - **USB-to-Serial adapter** for ATOS receiver connection
 - **Network connection** for TAK server communication
 - **Display** (optional, for local dashboard viewing)
@@ -56,7 +59,7 @@ A comprehensive system for forwarding ATOS tracker data to TAK servers with real
 ## 🛠️ Installation
 
 ### Step 1: System Preparation
-   ```bash
+```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
 
@@ -68,34 +71,33 @@ sudo usermod -a -G dialout pi
 ```
 
 ### Step 2: Repository Setup
-   ```bash
+```bash
 # Clone repository
-   cd /home/pi
+cd /home/pi
 git clone https://github.com/mjthree/ATOS-Tak-Forwarder.git
 cd ATOS-Tak-Forwarder
 
 # Pull latest changes
 git pull origin main
-   ```
+```
 
-### Step 3: High-Volume Service Installation
-   ```bash
-# Run the high-volume installer
-chmod +x install_high_volume.sh
-sudo ./install_high_volume.sh
+### Step 3: TDMA Service Installation
+```bash
+# Run the TDMA installer
+chmod +x install.sh
+sudo ./install.sh
 ```
 
 The installer will:
-- ✅ Create Python virtual environment
-- ✅ Install all dependencies (Flask, pyserial, Werkzeug)
-- ✅ Set up systemd service (`atos-high-volume.service`)
+- ✅ Install Python dependencies (Flask, pyserial, Werkzeug)
+- ✅ Set up systemd service (`atos-tdma.service`)
 - ✅ Configure proper permissions
-- ✅ Create service directory at `/opt/atos-tak-forwarder-high-volume/`
+- ✅ Enable service for auto-start
 
 ### Step 4: Configuration
 
 #### Serial Port Configuration
-   ```bash
+```bash
 # Find your serial port
 ls /dev/tty*
 
@@ -106,8 +108,8 @@ ls /dev/tty*
 ```
 
 The script automatically uses `/dev/ttyACM0`. If different, edit the service file:
-   ```bash
-sudo nano /etc/systemd/system/atos-high-volume.service
+```bash
+sudo nano /etc/systemd/system/atos-tdma.service
 ```
 
 #### TAK Server Configuration
@@ -117,23 +119,25 @@ Edit the TAK server settings in the web interface or modify `tak_server_config.j
   "ip": "192.168.1.100",
   "port": 8087,
   "multicast_port": 6969,
-  "send_interval": 2
+  "send_interval": 10,
+  "tdma_interval": 10,
+  "disable_multicast": false
 }
-   ```
+```
 
 ### Step 5: Service Management
 ```bash
 # Start the service
-sudo systemctl start atos-high-volume.service
+sudo systemctl start atos-tdma
 
 # Enable auto-start on boot
-sudo systemctl enable atos-high-volume.service
+sudo systemctl enable atos-tdma
 
 # Check status
-sudo systemctl status atos-high-volume.service
+sudo systemctl status atos-tdma
 
 # View logs
-sudo journalctl -u atos-high-volume.service -f
+sudo journalctl -u atos-tdma -f
 ```
 
 ## 🌐 Web Interface Access
@@ -141,6 +145,7 @@ sudo journalctl -u atos-high-volume.service -f
 ### Dashboard URLs
 - **Main Control:** `http://[PI_IP]:5000/`
 - **Display Dashboard:** `http://[PI_IP]:5000/display`
+- **Database Interface:** `http://[PI_IP]:5000/database`
 - **API Endpoint:** `http://[PI_IP]:5000/api/tags`
 
 ### Finding Your Pi's IP
@@ -156,6 +161,7 @@ hostname -I
 - **Callsign Management:** Set friendly names for tags
 - **Template System:** Save and load configurations
 - **Statistics:** Performance metrics and packet counts
+- **Database Analysis:** Historical data viewing and export
 
 ## 🔧 Configuration
 
@@ -180,92 +186,85 @@ hostname -I
   "ip": "192.168.1.100",
   "port": 8087,
   "multicast_port": 6969,
-  "send_interval": 2
+  "send_interval": 10,
+  "tdma_interval": 10,
+  "disable_multicast": false
 }
 ```
 
-### Performance Settings
-- **TAG_RATE_LIMIT:** 2 seconds (minimum time between updates per tag)
-- **UDP_BATCH_INTERVAL:** 2 seconds (how often to send batches)
-- **BATCH_SIZE:** 10 (maximum tags per UDP batch)
-- **STALE_SECONDS:** 30 seconds (when to mark tag as stale)
+### TDMA Settings
+- **tdma_interval:** Time in seconds for complete tag cycle (default: 10)
+- **send_interval:** Time in seconds between multicast broadcasts (default: 10)
+- **TAG_RATE_LIMIT:** 1 second (minimum time between updates per tag)
+- **STALE_SECONDS:** 60 seconds (when to mark tag as stale)
 
 ## 📊 Monitoring and Logs
 
 ### Log Files
-- **Tag Updates:** `comprehensive_logs/tag_updates.log`
-- **Voltage Tracking:** `comprehensive_logs/voltage_tracking.log`
-- **Status Changes:** `comprehensive_logs/status_changes.log`
-- **TAK Forwarding:** `comprehensive_logs/tak_forwarding.log`
+- **Comprehensive Logs:** `comprehensive_logs/all_tag_updates_*.jsonl`
+- **Voltage Tracking:** `comprehensive_logs/voltage_tracking_*.csv`
+- **Tag Status:** `comprehensive_logs/tag_status_*.jsonl`
+- **TAK Forwarding:** `comprehensive_logs/tak_forwarding_*.log`
+
+### Database Storage
+- **SQLite Database:** Automatic storage of all tag events
+- **Historical Analysis:** Track altitude, battery, and status changes
+- **Export Options:** CSV and KML export for external analysis
 
 ### Viewing Logs
 ```bash
-# Real-time tag updates
-tail -f comprehensive_logs/tag_updates.log
-
-# Battery voltage tracking
-tail -f comprehensive_logs/voltage_tracking.log
-
-# TAK forwarding activity
-tail -f comprehensive_logs/tak_forwarding.log
-```
-
-### Service Logs
-   ```bash
-# View service logs
-sudo journalctl -u atos-high-volume.service -f
+# Real-time service logs
+sudo journalctl -u atos-tdma -f
 
 # View last 50 log entries
-sudo journalctl -u atos-high-volume.service -n 50
-   ```
+sudo journalctl -u atos-tdma -n 50
+
+# Check comprehensive logs
+ls -la comprehensive_logs/
+```
 
 ## 🔄 Updates and Maintenance
 
 ### Updating the Forwarder
-   ```bash
+```bash
 # Stop the service
-sudo systemctl stop atos-high-volume.service
+sudo systemctl stop atos-tdma
 
 # Pull latest changes
 git pull origin main
 
-# Copy updated files to service directory
-sudo cp marshall_tak_high_volume.py /opt/atos-tak-forwarder-high-volume/
-sudo cp templates/*.html /opt/atos-tak-forwarder-high-volume/templates/
-sudo cp forwarding_config.json /opt/atos-tak-forwarder-high-volume/
-
 # Restart the service
-sudo systemctl start atos-high-volume.service
+sudo systemctl start atos-tdma
 
 # Check status
-sudo systemctl status atos-high-volume.service
+sudo systemctl status atos-tdma
 ```
 
 ### Backup Configuration
-   ```bash
+```bash
 # Backup current configuration
 cp forwarding_config.json forwarding_config_backup.json
 cp tak_server_config.json tak_server_config_backup.json
-   ```
+```
 
 ## 🚨 Troubleshooting
 
 ### Service Won't Start
-   ```bash
+```bash
 # Check service status
-sudo systemctl status atos-high-volume.service
+sudo systemctl status atos-tdma
 
 # View detailed logs
-sudo journalctl -u atos-high-volume.service -n 50
+sudo journalctl -u atos-tdma -n 50
 
 # Check Python syntax
-python3 -m py_compile marshall_tak_high_volume.py
+python3 -m py_compile marshall_tak_tdma.py
 ```
 
 ### Common Issues
 
 #### 1. Serial Port Access
-   ```bash
+```bash
 # Check if user is in dialout group
 groups pi
 
@@ -274,10 +273,10 @@ sudo usermod -a -G dialout pi
 
 # Reboot or logout/login
 sudo reboot
-   ```
+```
 
 #### 2. Port Already in Use
-   ```bash
+```bash
 # Check what's using port 5000
 sudo netstat -tlnp | grep :5000
 
@@ -288,24 +287,13 @@ sudo kill -9 [PID]
 #### 3. Permission Issues
 ```bash
 # Fix ownership
-sudo chown -R pi:pi /opt/atos-tak-forwarder-high-volume/
+sudo chown -R pi:pi /home/pi/ATOS-Tak-Forwarder/
 
 # Fix permissions
-sudo chmod +x /opt/atos-tak-forwarder-high-volume/marshall_tak_high_volume.py
+sudo chmod +x marshall_tak_tdma.py
 ```
 
-#### 4. Virtual Environment Issues
-```bash
-# Recreate virtual environment
-cd /opt/atos-tak-forwarder-high-volume/
-rm -rf venv
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-deactivate
-```
-
-#### 5. Network/Firewall Issues
+#### 4. Network/Firewall Issues
 ```bash
 # Check firewall status
 sudo ufw status
@@ -316,23 +304,6 @@ sudo ufw allow 5000
 # Check network connectivity
 ping 8.8.8.8
 ```
-
-### Performance Issues
-
-#### High CPU Usage
-- Check number of active tags
-- Monitor packet queue size
-- Consider increasing rate limiting
-
-#### Memory Issues
-- Monitor memory usage: `free -h`
-- Check for memory leaks in logs
-- Restart service if needed
-
-#### Network Issues
-- Check TAK server connectivity
-- Verify multicast is working
-- Monitor UDP packet loss
 
 ## 📡 TAK Integration
 
@@ -358,15 +329,16 @@ The forwarder sends standard CoT messages with custom ATOS extensions:
 </event>
 ```
 
+### TDMA Scheduling
+- **Deterministic:** Each tag gets a specific time slot
+- **Configurable:** Adjustable cycle time via `tdma_interval`
+- **Reliable:** Ensures all tags are transmitted regularly
+- **Efficient:** Prevents packet collisions and ensures fair access
+
 ### Multicast Support
 - **UDP 6969:** Standard ATAK multicast port
 - **Address:** 239.2.3.1 (standard TAK multicast)
 - **Automatic:** All COT messages sent to both TAK server and multicast
-
-### Rate Limiting
-- **Per-tag:** 2-second minimum between updates (configurable)
-- **Batch processing:** Efficient UDP batching
-- **Queue management:** Prevents memory overflow
 
 ## 🎯 Advanced Features
 
@@ -384,13 +356,15 @@ Save and load different configurations:
 - `POST /api/tag/{id}/callsign` - Set tag callsign
 - `POST /api/tag/{id}/color` - Set tag color
 - `POST /api/tag/{id}/track_type` - Set track type
+- `GET /api/db/tags` - List all tags in database
+- `GET /api/db/tag_data` - Get historical data for a tag
 
-### Performance Monitoring
-- **Active tags:** Number of currently tracked tags
-- **Packet counts:** Total packets processed
-- **Rate limiting:** Number of packets rate-limited
-- **UDP sends:** Number of COT messages sent
-- **Queue size:** Current packet queue depth
+### Database Features
+- **Historical Analysis:** View altitude trends over time
+- **CSV Export:** Download data for external analysis
+- **KML Export:** Create Google Earth compatible files
+- **Time Range Selection:** Filter data by date/time
+- **Ground Level Adjustment:** Calculate AGL altitudes
 
 ## 🔒 Security Considerations
 
@@ -415,10 +389,10 @@ Save and load different configurations:
 ### Common Commands Reference
 ```bash
 # Service management
-sudo systemctl start/stop/restart/status atos-high-volume.service
+sudo systemctl start/stop/restart/status atos-tdma
 
 # Log viewing
-sudo journalctl -u atos-high-volume.service -f
+sudo journalctl -u atos-tdma -f
 
 # Configuration backup
 cp forwarding_config.json backup_$(date +%Y%m%d).json
@@ -432,20 +406,15 @@ ping [TAK_SERVER_IP]
 
 ## 📝 Version History
 
-### Current Version: High-Volume Optimized
-- **Optimized for 100+ devices**
-- **Queue-based processing**
+### Current Version: TDMA Optimized
+- **Deterministic TDMA scheduling**
 - **Multicast support**
+- **Database integration**
 - **Advanced rate limiting**
 - **Comprehensive logging**
-- **Web dashboard**
+- **Web dashboard with database interface**
 - **TAK integration**
-
-### Previous Versions
-- Basic ATOS tracker display
-- Simple TAK forwarding
-- Manual configuration
 
 ---
 
-**Note:** This system is designed for high-volume ATOS tracker environments. For smaller deployments (< 10 devices), consider using the basic version for simplicity.
+**Note:** This system is designed for reliable ATOS tracker environments with deterministic scheduling. The TDMA approach ensures fair access and prevents packet collisions.
