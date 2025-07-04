@@ -34,6 +34,10 @@ UNKNOWN_COORD = 9999999.0
 JSON_EXPORT_PATH = 'latest_tag_data.json'
 STALE_SECONDS = 60
 
+# ==== Logging Configuration ====
+# Set to True to enable file logging, False to disable (SQLite logging always enabled)
+ENABLE_FILE_LOGGING = False
+
 # High-volume optimizations
 MAX_QUEUE_SIZE = 1000
 BATCH_SIZE = 50
@@ -160,6 +164,8 @@ def log_tag_update(tag_data_entry):
         print(f"Error logging tag update to SQLite: {e}")
 
 def log_voltage_tracking(tag_id, voltage, timestamp_str):
+    if not ENABLE_FILE_LOGGING:
+        return
     try:
         with open(VOLTAGE_LOG_FILE, 'a') as f:
             f.write(f"{timestamp_str},{tag_id},{voltage}\n")
@@ -188,6 +194,9 @@ def log_tag_status_change(tag_id, old_data, new_data):
         print(f"Error logging status change to SQLite: {e}")
 
 def initialize_log_files():
+    if not ENABLE_FILE_LOGGING:
+        print("📝 File logging disabled - only SQLite logging enabled")
+        return
     try:
         with open(VOLTAGE_LOG_FILE, 'w') as f:
             f.write("timestamp,tag_id,voltage\n")
@@ -236,6 +245,8 @@ def log_tak_forward(tag_id, tag, tak_cfg, cot_message: bytes):
         print(f"Error logging TAK forward to SQLite: {e}")
 
 def log_tak_config_update():
+    if not ENABLE_FILE_LOGGING:
+        return
     try:
         with open(TAK_FORWARD_LOG_FILE, 'a') as f:
             entry = {
@@ -374,6 +385,8 @@ def get_tag_staleness(tag, threshold_seconds=STALE_SECONDS):
         return True
 
 def export_json_with_stale():
+    if not ENABLE_FILE_LOGGING:
+        return
     try:
         export_data = {
             'tags': {},
@@ -1131,6 +1144,271 @@ def api_db_export_kml():
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
     response.headers['Content-Type'] = 'application/vnd.google-earth.kml+xml'
     return response
+
+@app.route('/admin')
+def admin_page():
+    return render_template('admin.html')
+
+@app.route('/api/admin/db_info')
+def api_admin_db_info():
+    """Get database information including size, record counts, etc."""
+    try:
+        with atos_sqlite.get_db() as conn:
+            # Get total record count
+            total_records = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
+            
+            # Get record count by tag_id (1-100 only)
+            tag_counts = {}
+            for tag_id in range(1, 101):
+                count = conn.execute('SELECT COUNT(*) as count FROM tag_events WHERE tag_id = ?', (tag_id,)).fetchone()['count']
+                if count > 0:
+                    tag_counts[tag_id] = count
+            
+            # Get date range
+            date_range = conn.execute('SELECT MIN(timestamp) as min_ts, MAX(timestamp) as max_ts FROM tag_events').fetchone()
+            
+            # Get database file size
+            db_path = atos_sqlite.get_db_path()
+            file_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+            
+            # Get archived databases
+            archive_dir = Path('database_archives')
+            archive_dir.mkdir(exist_ok=True)
+            archived_dbs = []
+            for db_file in archive_dir.glob('*.db'):
+                archived_dbs.append({
+                    'name': db_file.name,
+                    'size': os.path.getsize(db_file),
+                    'modified': datetime.fromtimestamp(os.path.getmtime(db_file)).isoformat()
+                })
+            
+            return jsonify({
+                'total_records': total_records,
+                'tag_counts': tag_counts,
+                'date_range': {
+                    'min': date_range['min_ts'],
+                    'max': date_range['max_ts']
+                },
+                'file_size': file_size,
+                'archived_databases': archived_dbs
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/download_db')
+def api_admin_download_db():
+    """Download the current SQLite database"""
+    try:
+        db_path = atos_sqlite.get_db_path()
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database file not found'}), 404
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'atos_events_{timestamp}.db'
+        
+        return send_file(
+            db_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/x-sqlite3'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/archive_db')
+def api_admin_archive_db():
+    """Archive the current database and start a new one"""
+    try:
+        db_path = atos_sqlite.get_db_path()
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database file not found'}), 404
+        
+        # Create archive directory
+        archive_dir = Path('database_archives')
+        archive_dir.mkdir(exist_ok=True)
+        
+        # Create archive filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        archive_path = archive_dir / f'atos_events_archive_{timestamp}.db'
+        
+        # Copy current database to archive
+        import shutil
+        shutil.copy2(db_path, archive_path)
+        
+        # Get record count before clearing
+        with atos_sqlite.get_db() as conn:
+            record_count = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
+        
+        # Clear current database
+        with atos_sqlite.get_db() as conn:
+            conn.execute('DELETE FROM tag_events')
+            conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Database archived with {record_count} records',
+            'archive_file': archive_path.name,
+            'archive_size': os.path.getsize(archive_path)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/download_archive/<filename>')
+def api_admin_download_archive(filename):
+    """Download an archived database"""
+    try:
+        archive_path = Path('database_archives') / filename
+        if not archive_path.exists():
+            return jsonify({'error': 'Archive file not found'}), 404
+        
+        return send_file(
+            archive_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/x-sqlite3'
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/load_archive', methods=['POST'])
+def api_admin_load_archive():
+    """Load an archived database (merge or overwrite)"""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        action = data.get('action')  # 'merge' or 'overwrite'
+        
+        if not filename or action not in ['merge', 'overwrite']:
+            return jsonify({'error': 'Invalid parameters'}), 400
+        
+        archive_path = Path('database_archives') / filename
+        if not archive_path.exists():
+            return jsonify({'error': 'Archive file not found'}), 404
+        
+        current_db_path = atos_sqlite.get_db_path()
+        
+        if action == 'overwrite':
+            # Backup current database first
+            backup_path = current_db_path.with_suffix('.db.backup')
+            import shutil
+            shutil.copy2(current_db_path, backup_path)
+            
+            # Replace current database with archive
+            shutil.copy2(archive_path, current_db_path)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Database overwritten with archive: {filename}',
+                'backup_created': backup_path.name
+            })
+        
+        elif action == 'merge':
+            # Merge archive data into current database
+            import sqlite3
+            
+            # Connect to both databases
+            with sqlite3.connect(current_db_path) as current_conn, sqlite3.connect(archive_path) as archive_conn:
+                # Get data from archive
+                archive_data = archive_conn.execute('SELECT * FROM tag_events').fetchall()
+                
+                # Insert into current database (ignore duplicates based on timestamp and tag_id)
+                cursor = current_conn.cursor()
+                for row in archive_data:
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO tag_events 
+                        (timestamp, tag_id, latitude, longitude, altitude_ft, battery_voltage, 
+                         temperature, pdop, wire_status, object_status, emergency, is_fresh, 
+                         bad_gps, tak_ip, tak_port, cot_xml, event_type)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', row)
+                
+                current_conn.commit()
+                merged_count = cursor.rowcount
+            
+            return jsonify({
+                'success': True,
+                'message': f'Merged {merged_count} records from archive: {filename}'
+            })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/clear_old_data', methods=['POST'])
+def api_admin_clear_old_data():
+    """Clear data older than specified days"""
+    try:
+        data = request.get_json()
+        days = data.get('days', 30)
+        
+        if not isinstance(days, int) or days < 1:
+            return jsonify({'error': 'Days must be a positive integer'}), 400
+        
+        cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_str = cutoff_date.isoformat()
+        
+        with atos_sqlite.get_db() as conn:
+            # Get count before deletion
+            count_before = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
+            
+            # Delete old records
+            cursor = conn.execute('DELETE FROM tag_events WHERE timestamp < ?', (cutoff_str,))
+            deleted_count = cursor.rowcount
+            
+            # Get count after deletion
+            count_after = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
+            
+            conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Deleted {deleted_count} records older than {days} days',
+            'records_before': count_before,
+            'records_after': count_after,
+            'cutoff_date': cutoff_str
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/clear_db')
+def api_admin_clear_db():
+    """Clear all data from the database"""
+    try:
+        with atos_sqlite.get_db() as conn:
+            # Get count before deletion
+            count_before = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
+            
+            # Clear all data
+            conn.execute('DELETE FROM tag_events')
+            conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Cleared {count_before} records from database'
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/cleanup_invalid_tags')
+def api_admin_cleanup_invalid_tags():
+    """Remove data from tags outside the 1-100 range"""
+    try:
+        with atos_sqlite.get_db() as conn:
+            # Get count of invalid tags before deletion
+            invalid_count = conn.execute('SELECT COUNT(*) as count FROM tag_events WHERE tag_id < 1 OR tag_id > 100').fetchone()['count']
+            
+            # Delete invalid tags
+            conn.execute('DELETE FROM tag_events WHERE tag_id < 1 OR tag_id > 100')
+            conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Removed {invalid_count} records from invalid tag IDs (outside 1-100 range)'
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ==== Signal handling ====
 def signal_handler(sig, frame):

@@ -37,6 +37,11 @@ def init_db():
         conn.executescript(SCHEMA)
 
 def insert_tag_event(**kwargs):
+    # Only store data for tags 1-100
+    tag_id = kwargs.get('tag_id')
+    if tag_id is None or tag_id < 1 or tag_id > 100:
+        return  # Skip invalid tag IDs
+    
     fields = [
         'timestamp','tag_id','latitude','longitude','altitude_ft','battery_voltage','temperature','pdop',
         'wire_status','object_status','emergency','is_fresh','bad_gps','tak_ip','tak_port','cot_xml','event_type'

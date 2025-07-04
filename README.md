@@ -8,18 +8,20 @@ A comprehensive system for forwarding ATOS tracker data to TAK servers with real
 ## 🚀 Features
 
 ### Core Functionality
-- **TDMA Scheduling:** Deterministic tag transmission with configurable intervals
-- **TAK Server Integration:** Forwards COT messages to TAK servers via UDP
-- **Multicast Support:** Broadcasts to UDP 6969 for ATAK compatibility
+- **TDMA Scheduling:** Deterministic tag transmission with configurable intervals (default: 2 seconds)
+- **TAK Server Integration:** Forwards COT messages to TAK servers via UDP (default port: 8686)
+- **Multicast Support:** Broadcasts to UDP 6969 for ATAK compatibility with configurable intervals
 - **Real-time Web Dashboard:** Live monitoring with 10x10 grid display
 - **Database Integration:** SQLite storage for historical data and analysis
 - **Rate Limiting:** Per-tag rate limiting to prevent spam
 - **Service Mode:** Runs as systemd service on Raspberry Pi
+- **Configuration Persistence:** All settings persist across reboots via JSON config files
 
 ### Web Interface Sites
 - **Main Control:** `http://[PI_IP]:5000/` - Full configuration and monitoring interface
 - **Display Dashboard:** `http://[PI_IP]:5000/display` - Clean 10x10 grid for wall mounting
 - **Database Interface:** `http://[PI_IP]:5000/database` - Historical data analysis and export
+- **Admin Panel:** `http://[PI_IP]:5000/admin` - Database management (hidden, no navigation links)
 - **API Endpoints:** RESTful API for programmatic access
 
 ### Track Type Support
@@ -84,8 +86,8 @@ git pull origin main
 ### Step 3: TDMA Service Installation
 ```bash
 # Run the TDMA installer
-chmod +x install.sh
-sudo ./install.sh
+chmod +x install_tdma_testing.sh
+sudo ./install_tdma_testing.sh
 ```
 
 The installer will:
@@ -117,10 +119,11 @@ Edit the TAK server settings in the web interface or modify `tak_server_config.j
 ```json
 {
   "ip": "192.168.1.100",
-  "port": 8087,
+  "port": 8686,
   "multicast_port": 6969,
   "send_interval": 10,
-  "tdma_interval": 10,
+  "tdma_interval": 2,
+  "multicast_interval": 2,
   "disable_multicast": false
 }
 ```
@@ -146,6 +149,7 @@ sudo journalctl -u atos-tdma -f
 - **Main Control:** `http://[PI_IP]:5000/`
 - **Display Dashboard:** `http://[PI_IP]:5000/display`
 - **Database Interface:** `http://[PI_IP]:5000/database`
+- **Admin Panel:** `http://[PI_IP]:5000/admin` (hidden, no navigation links)
 - **API Endpoint:** `http://[PI_IP]:5000/api/tags`
 
 ### Finding Your Pi's IP
@@ -162,6 +166,8 @@ hostname -I
 - **Template System:** Save and load configurations
 - **Statistics:** Performance metrics and packet counts
 - **Database Analysis:** Historical data viewing and export
+- **Multicast Control:** Enable/disable multicast with dropdown interface
+- **Admin Panel:** Database management (hidden, access via `/admin` URL)
 
 ## 🔧 Configuration
 
@@ -184,18 +190,18 @@ hostname -I
 ```json
 {
   "ip": "192.168.1.100",
-  "port": 8087,
+  "port": 8686,
   "multicast_port": 6969,
   "send_interval": 10,
-  "tdma_interval": 10,
+  "tdma_interval": 2,
   "multicast_interval": 2,
   "disable_multicast": false
 }
 ```
 
 ### TDMA Settings
-- **tdma_interval:** Time in seconds for complete tag cycle (default: 10)
-- **send_interval:** Time in seconds between multicast broadcasts (default: 10)
+- **tdma_interval:** Time in seconds for complete tag cycle (default: 2)
+- **send_interval:** Time in seconds between TDMA cycles (default: 10)
 - **multicast_interval:** Time in seconds between multicast broadcasts (default: 2)
 - **TAG_RATE_LIMIT:** 1 second (minimum time between updates per tag)
 - **STALE_SECONDS:** 60 seconds (when to mark tag as stale)
@@ -203,15 +209,41 @@ hostname -I
 ## 📊 Monitoring and Logs
 
 ### Log Files
-- **Comprehensive Logs:** `comprehensive_logs/all_tag_updates_*.jsonl`
-- **Voltage Tracking:** `comprehensive_logs/voltage_tracking_*.csv`
-- **Tag Status:** `comprehensive_logs/tag_status_*.jsonl`
-- **TAK Forwarding:** `comprehensive_logs/tak_forwarding_*.log`
+- **SQLite Database:** Primary logging to `atos_events.db` (always enabled)
+- **Comprehensive Logs:** `comprehensive_logs/all_tag_updates_*.jsonl` (disabled by default)
+- **Voltage Tracking:** `comprehensive_logs/voltage_tracking_*.csv` (disabled by default)
+- **Tag Status:** `comprehensive_logs/tag_status_*.jsonl` (disabled by default)
+- **TAK Forwarding:** `comprehensive_logs/tak_forwarding_*.log` (disabled by default)
+
+**Note:** File logging is disabled by default to reduce disk I/O. Only SQLite database logging is active. To re-enable file logging, edit `marshall_tak_tdma.py` and change `ENABLE_FILE_LOGGING = False` to `ENABLE_FILE_LOGGING = True`, then restart the service.
 
 ### Database Storage
 - **SQLite Database:** Automatic storage of all tag events
 - **Historical Analysis:** Track altitude, battery, and status changes
 - **Export Options:** CSV and KML export for external analysis
+- **Tag Filtering:** Only stores data for tags 1-100 (invalid tags automatically filtered)
+
+### Admin Panel (Hidden)
+The admin panel at `http://[PI_IP]:5000/admin` provides advanced database management:
+
+#### Database Operations
+- **Download Current DB:** Download the active SQLite database
+- **Archive & Clear:** Create timestamped backup and start fresh database
+- **Clear All Data:** Permanently delete all data from database
+- **Clear Old Data:** Remove data older than specified days
+- **Cleanup Invalid Tags:** Remove data from tags outside 1-100 range
+
+#### Archive Management
+- **View Archives:** List all archived databases with timestamps and sizes
+- **Download Archives:** Download any archived database
+- **Load Archives:** Merge or overwrite current database with archived data
+- **Automatic Backup:** Current database backed up before overwrite operations
+
+#### Database Information
+- **Record Counts:** Total records and per-tag breakdown
+- **File Sizes:** Database and archive file sizes
+- **Date Ranges:** Oldest and newest data timestamps
+- **Tag Statistics:** Visual grid showing record counts for tags 1-100
 
 ### Viewing Logs
 ```bash
@@ -223,6 +255,9 @@ sudo journalctl -u atos-tdma -n 50
 
 # Check comprehensive logs
 ls -la comprehensive_logs/
+
+# Monitor multicast traffic (for debugging)
+sudo tcpdump -i any -n udp port 6969 -X
 ```
 
 ## 🔄 Updates and Maintenance
@@ -307,6 +342,17 @@ sudo ufw allow 5000
 ping 8.8.8.8
 ```
 
+#### 5. Multicast Issues
+```bash
+# Test multicast connectivity
+sudo tcpdump -i any -n udp dst 239.2.3.1 and port 6969 -X
+
+# Check if multicast is enabled
+sudo systemctl status atos-tdma | grep multicast
+
+# Verify multicast configuration in web interface
+```
+
 ## 📡 TAK Integration
 
 ### COT Message Format
@@ -333,16 +379,17 @@ The forwarder sends standard CoT messages with custom ATOS extensions:
 
 ### TDMA Scheduling
 - **Deterministic:** Each tag gets a specific time slot
-- **Configurable:** Adjustable cycle time via `tdma_interval`
+- **Configurable:** Adjustable cycle time via `tdma_interval` (default: 2 seconds)
 - **Reliable:** Ensures all tags are transmitted regularly
 - **Efficient:** Prevents packet collisions and ensures fair access
 
 ### Multicast Support
 - **UDP 6969:** Standard ATAK multicast port
 - **Address:** 239.2.3.1 (standard TAK multicast)
-- **Configurable Interval:** User can set multicast broadcast interval (1-15 seconds)
+- **Configurable Interval:** User can set multicast broadcast interval (1-15 seconds, default: 2)
 - **Independent Operation:** Multicast operates separately from TDMA scheduling
 - **All Active Tags:** Sends all non-stale, forwarded tags in each multicast batch
+- **Easy Control:** Simple dropdown interface to enable/disable multicast
 
 ## 🎯 Advanced Features
 
@@ -406,19 +453,24 @@ curl http://localhost:5000/api/stats
 
 # Network connectivity test
 ping [TAK_SERVER_IP]
+
+# Multicast monitoring
+sudo tcpdump -i any -n udp port 6969 -X
 ```
 
 ## 📝 Version History
 
 ### Current Version: TDMA Optimized
-- **Deterministic TDMA scheduling**
-- **Multicast support**
+- **Deterministic TDMA scheduling (2-second default interval)**
+- **Multicast support with configurable intervals**
 - **Database integration**
 - **Advanced rate limiting**
 - **Comprehensive logging**
 - **Web dashboard with database interface**
-- **TAK integration**
+- **TAK integration (default port 8686)**
+- **Configuration persistence across reboots**
+- **Improved multicast control interface**
 
 ---
 
-**Note:** This system is designed for reliable ATOS tracker environments with deterministic scheduling. The TDMA approach ensures fair access and prevents packet collisions.
+**Note:** This system is designed for reliable ATOS tracker environments with deterministic scheduling. The TDMA approach ensures fair access and prevents packet collisions. All configuration changes are automatically saved and persist across system reboots.
