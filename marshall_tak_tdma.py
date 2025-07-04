@@ -1324,6 +1324,21 @@ def api_admin_cleanup_invalid_tags():
         print(f'[ADMIN] Cleanup Invalid Tags: ERROR: {e}')
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/admin/delete_archive/<filename>', methods=['DELETE'])
+def api_admin_delete_archive(filename):
+    print(f'[ADMIN] Delete Archive: Attempting to delete {filename}')
+    try:
+        archive_path = Path('database_archives') / filename
+        if not archive_path.exists():
+            print('[ADMIN] Delete Archive: File not found')
+            return jsonify({'error': 'Archive file not found'}), 404
+        archive_path.unlink()
+        print(f'[ADMIN] Delete Archive: Deleted {filename}')
+        return jsonify({'success': True, 'message': f'Archive {filename} deleted.'})
+    except Exception as e:
+        print(f'[ADMIN] Delete Archive: ERROR: {e}')
+        return jsonify({'error': str(e)}), 500
+
 # ==== Signal handling ====
 def signal_handler(sig, frame):
     print("\n🛑 Shutting down High-Volume ATOS TAK Forwarder...")

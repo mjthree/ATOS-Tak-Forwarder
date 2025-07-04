@@ -660,6 +660,7 @@
                             <div class="archive-actions">
                                 <button class="btn btn-success" onclick="downloadArchive('${archive.name}')">Download</button>
                                 <button class="btn btn-warning" onclick="showLoadArchiveModal('${archive.name}')">Load</button>
+                                <button class="btn btn-danger" onclick="deleteArchive('${archive.name}')">Delete</button>
                             </div>
                         `;
                         archiveList.appendChild(archiveItem);
@@ -758,6 +759,26 @@
                     modal.style.display = 'none';
                 }
             });
+        }
+        
+        async function deleteArchive(filename) {
+            if (!confirm(`Are you sure you want to delete archive: ${filename}?`)) return;
+            showLoading();
+            try {
+                const response = await fetch(`/api/admin/delete_archive/${filename}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (response.ok) {
+                    showAlert(data.message);
+                    loadArchives();
+                    refreshDbInfo();
+                } else {
+                    showAlert(data.error || 'Failed to delete archive', 'error');
+                }
+            } catch (error) {
+                showAlert('Error deleting archive: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
         }
     </script>
 </body>
