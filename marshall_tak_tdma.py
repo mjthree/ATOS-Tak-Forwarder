@@ -31,6 +31,7 @@ from functools import wraps
 import hashlib
 
 app = Flask(__name__)
+app.secret_key = 'apexshield-atos-tak-forwarder-2024'
 
 # ==== Global Configuration ====
 UNKNOWN_COORD = 9999999.0
