@@ -51,4 +51,7 @@ def insert_tag_event(**kwargs):
         conn.execute(f"""
             INSERT INTO tag_events ({','.join(fields)})
             VALUES ({','.join(['?']*len(fields))})
-        """, values) 
+        """, values)
+
+def get_db_path():
+    return str(DB_PATH) 
