@@ -51,7 +51,11 @@
             <option value="10">10s</option>
             <option value="15">15s</option>
         </select>
-        <label style="margin-left:8px;"><input type="checkbox" id="disable-multicast"> Disable Multicast</label>
+        Multicast:
+        <select id="multicast-status">
+            <option value="false">On - Send to multicast</option>
+            <option value="true">Off - Don't send to multicast</option>
+        </select>
         <div style="font-size:0.8em;margin-top:5px;opacity:0.8;">📡 Multicast sends all tags at configurable interval when enabled</div>
     </div>
 </div>
@@ -174,7 +178,7 @@ function updateTable(tags){
       document.getElementById('multicast-port').value=d.multicast_port||6969;
       document.getElementById('tdma-interval').value=d.send_interval||10;
       document.getElementById('multicast-interval').value=d.multicast_interval||2;
-      document.getElementById('disable-multicast').checked = !!d.disable_multicast;
+      document.getElementById('multicast-status').value = d.disable_multicast ? 'true' : 'false';
     });
     fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
     fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
@@ -185,7 +189,7 @@ function updateTable(tags){
     const multicast_port=document.getElementById('multicast-port').value;
     const send_interval=document.getElementById('tdma-interval').value;
     const multicast_interval=document.getElementById('multicast-interval').value;
-    const disable_multicast=document.getElementById('disable-multicast').checked;
+    const disable_multicast=document.getElementById('multicast-status').value === 'true';
     fetch('/api/tak_server',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
