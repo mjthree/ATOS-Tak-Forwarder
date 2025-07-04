@@ -658,12 +658,18 @@ def multicast_batch_loop():
         
         print(f"📡 Preparing multicast batch with {len(tag_items)} total tags")
         
+        stale_count = 0
+        not_forwarded_count = 0
+        added_count = 0
+        
         for tag_id, tag in tag_items:
             if get_tag_staleness(tag):
+                stale_count += 1
                 continue
             cfg = forwarding_config['tags'].get(str(tag_id), {})
             should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
             if not should_forward:
+                not_forwarded_count += 1
                 continue
             tag_to_send = tag.copy()
             tag_to_send['color'] = cfg.get('color', 'white')
@@ -671,6 +677,9 @@ def multicast_batch_loop():
             callsign = cfg.get('callsign') or str(tag_id)
             tag_to_send['callsign'] = callsign
             batch_messages.append((tag_id, tag_to_send, callsign))
+            added_count += 1
+
+        print(f"📡 Multicast filtering results: {len(tag_items)} total, {stale_count} stale, {not_forwarded_count} not forwarded, {added_count} added to batch")
 
         if batch_messages:
             print(f"📡 Sending multicast batch with {len(batch_messages)} tags")
