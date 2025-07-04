@@ -323,6 +323,27 @@
         <div class="header">
             <h1>ATOS TAK Forwarder</h1>
             <p>Database Administration Panel</p>
+            <div style="background:#fff3cd;color:#856404;padding:18px 24px;border-radius:8px;margin:24px auto 0 auto;max-width:700px;text-align:left;font-size:1.1em;">
+                <b>Instructions:</b><br>
+                <ul style="margin-top:8px;">
+                    <li><b>Archive & Clear DB:</b> Creates a timestamped backup of the current database and clears all data. Use before major changes or to save space.</li>
+                    <li><b>Clear All Data:</b> Permanently deletes all tag data from the database. <b>This cannot be undone.</b></li>
+                    <li><b>Clear Old Data:</b> Removes data older than the number of days you specify. Enter any positive number of days.</li>
+                    <li><b>Cleanup Invalid Tags:</b> Removes records for tag IDs outside the 1-100 range.</li>
+                    <li><b>Download:</b> Download the current or archived database file for backup or analysis.</li>
+                    <li><b>Load (Merge/Overwrite):</b> Merge adds data from an archive to the current DB (matching columns by name). Overwrite replaces the current DB with the archive (the current DB is always backed up first).</li>
+                    <li><b>Delete:</b> Permanently deletes an archived database file.</li>
+                </ul>
+                <b>Tips for Proper Use:</b>
+                <ul style="margin-top:8px;">
+                    <li>For large databases, some operations may take time. Please wait for confirmation before refreshing or closing the page.</li>
+                    <li>For best results, <b>stop the ATOS service</b> before archiving, overwriting, or merging databases to avoid lock errors.</li>
+                    <li>After restoring or merging, restart the service and refresh this page to see updated data.</li>
+                    <li>To confirm archive deletion, check the <code>database_archives/</code> folder on disk.</li>
+                </ul>
+                <b>Security:</b> This admin panel is password protected. Only users with the admin password can access these controls.<br>
+                <b>Default password:</b> <code>apex123APEX!@#</code>
+            </div>
         </div>
         
         <div class="content">

@@ -16,6 +16,9 @@ A comprehensive system for forwarding ATOS tracker data to TAK servers with real
 - **Rate Limiting:** Per-tag rate limiting to prevent spam
 - **Service Mode:** Runs as systemd service on Raspberry Pi
 - **Configuration Persistence:** All settings persist across reboots via JSON config files
+- **Admin Panel:** Hidden database management interface with password protection
+- **HTTPS Support:** Optional secure access with mkcert and nginx
+- **FullPageOS Integration:** Kiosk mode support for wall-mounted displays
 
 ### Web Interface Sites
 - **Main Control:** `http://[PI_IP]:5000/` - Full configuration and monitoring interface
@@ -86,8 +89,8 @@ git pull origin main
 ### Step 3: TDMA Service Installation
 ```bash
 # Run the TDMA installer
-chmod +x install_tdma_testing.sh
-sudo ./install_tdma_testing.sh
+chmod +x install.sh
+sudo ./install.sh
 ```
 
 The installer will:
@@ -95,6 +98,13 @@ The installer will:
 - ✅ Set up systemd service (`atos-tdma.service`)
 - ✅ Configure proper permissions
 - ✅ Enable service for auto-start
+- ✅ **Optional HTTPS setup with mkcert and nginx**
+- ✅ **Admin password configuration (if HTTPS enabled)**
+
+#### HTTPS Setup Options
+During installation, you'll be prompted to set up HTTPS:
+- **Yes:** Installs mkcert, nginx, generates certificates, and sets admin password
+- **No:** Standard HTTP access, admin panel accessible without password
 
 ### Step 4: Configuration
 
@@ -146,11 +156,11 @@ sudo journalctl -u atos-tdma -f
 ## 🌐 Web Interface Access
 
 ### Dashboard URLs
-- **Main Control:** `http://[PI_IP]:5000/`
-- **Display Dashboard:** `http://[PI_IP]:5000/display`
-- **Database Interface:** `http://[PI_IP]:5000/database`
-- **Admin Panel:** `http://[PI_IP]:5000/admin` (hidden, no navigation links)
-- **API Endpoint:** `http://[PI_IP]:5000/api/tags`
+- **Main Control:** `http://[PI_IP]:5000/` or `https://[PI_IP]` (if HTTPS enabled)
+- **Display Dashboard:** `http://[PI_IP]:5000/display` or `https://[PI_IP]/display`
+- **Database Interface:** `http://[PI_IP]:5000/database` or `https://[PI_IP]/database`
+- **Admin Panel:** `http://[PI_IP]:5000/admin` or `https://[PI_IP]/admin` (hidden, no navigation links)
+- **API Endpoint:** `http://[PI_IP]:5000/api/tags` or `https://[PI_IP]/api/tags`
 
 ### Finding Your Pi's IP
 ```bash
@@ -168,6 +178,276 @@ hostname -I
 - **Database Analysis:** Historical data viewing and export
 - **Multicast Control:** Enable/disable multicast with dropdown interface
 - **Admin Panel:** Database management (hidden, access via `/admin` URL)
+
+## 🔒 Enabling HTTPS with mkcert and nginx (LAN Only)
+
+### Overview
+The installer can optionally set up HTTPS using mkcert for local certificates. This provides:
+- **Secure LAN access** without browser warnings
+- **Admin panel protection** with password authentication
+- **Professional appearance** for wall-mounted displays
+- **No internet dependency** (self-signed certificates)
+
+### Installation Process
+1. **Choose HTTPS during installer:** Select "y" when prompted
+2. **Set admin password:** Required for database management operations
+3. **Automatic setup:** mkcert, nginx, and certificates are configured automatically
+
+### Certificate Details
+- **Certificate Location:** `/etc/ssl/atos-tak/atos-tak.crt`
+- **Private Key:** `/etc/ssl/atos-tak/atos-tak.key`
+- **CA Certificate:** `/root/.local/share/mkcert/rootCA.pem`
+- **Validity:** Certificate ~2.3 years, CA ~10 years
+
+### Trusting Certificates on Other Devices
+To avoid browser warnings on other devices:
+
+#### Windows
+```bash
+# Copy CA certificate from Pi
+scp pi@[PI_IP]:/root/.local/share/mkcert/rootCA.pem .
+
+# Double-click and install as "Trusted Root Certification Authority"
+```
+
+#### macOS
+```bash
+# Copy CA certificate from Pi
+scp pi@[PI_IP]:/root/.local/share/mkcert/rootCA.pem .
+
+# Double-click and add to System keychain
+```
+
+#### Linux
+```bash
+# Copy CA certificate from Pi
+scp pi@[PI_IP]:/root/.local/share/mkcert/rootCA.pem .
+
+# Install system-wide
+sudo cp rootCA.pem /usr/local/share/ca-certificates/atos-tak-ca.crt
+sudo update-ca-certificates
+```
+
+### Manual HTTPS Setup (Post-Installation)
+If you skipped HTTPS during installation:
+
+```bash
+# Install mkcert and nginx
+sudo apt update
+sudo apt install -y mkcert nginx
+
+# Create SSL directory
+sudo mkdir -p /etc/ssl/atos-tak
+
+# Get Pi's hostname and IP
+PI_HOSTNAME=$(hostname)
+PI_IP=$(hostname -I | awk '{print $1}')
+
+# Generate certificate
+mkcert -install
+mkcert -key-file /etc/ssl/atos-tak/atos-tak.key -cert-file /etc/ssl/atos-tak/atos-tak.crt "$PI_HOSTNAME" "$PI_IP" "localhost" "127.0.0.1"
+
+# Set permissions
+sudo chmod 600 /etc/ssl/atos-tak/atos-tak.key
+sudo chmod 644 /etc/ssl/atos-tak/atos-tak.crt
+
+# Create nginx configuration
+sudo tee /etc/nginx/sites-available/atos-tak > /dev/null << EOF
+server {
+    listen 80;
+    server_name $PI_HOSTNAME $PI_IP;
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name $PI_HOSTNAME $PI_IP;
+    
+    ssl_certificate /etc/ssl/atos-tak/atos-tak.crt;
+    ssl_certificate_key /etc/ssl/atos-tak/atos-tak.key;
+    
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+# Enable site
+sudo ln -sf /etc/nginx/sites-available/atos-tak /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Test and restart nginx
+sudo nginx -t
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+```
+
+## 🖥️ Using with FullPageOS (Kiosk Mode)
+
+### Overview
+FullPageOS is a Raspberry Pi distribution that runs Chromium in kiosk mode, perfect for wall-mounted displays.
+
+### Installation
+1. **Download FullPageOS:** https://github.com/guysoft/FullPageOS
+2. **Flash to SD card:** Use Raspberry Pi Imager or similar
+3. **Configure network:** Set up WiFi or Ethernet
+4. **Boot FullPageOS:** Insert SD card and power on
+
+### Configuration
+1. **Access FullPageOS:** Connect to the Pi via SSH or monitor
+2. **Edit kiosk URL:** Modify the startup URL to point to your ATOS dashboard
+
+```bash
+# SSH into FullPageOS Pi
+ssh pi@[FULLPAGEOS_IP]
+
+# Edit the kiosk configuration
+sudo nano /home/pi/.config/lxsession/LXDE-pi/autostart
+
+# Replace the URL with your ATOS dashboard
+# For HTTP:
+@chromium-browser --kiosk http://[ATOS_PI_IP]:5000/display
+
+# For HTTPS (if configured):
+@chromium-browser --kiosk https://[ATOS_PI_IP]/display
+```
+
+### HTTPS with FullPageOS
+If using HTTPS with mkcert:
+
+1. **Copy CA certificate to FullPageOS:**
+```bash
+# From your computer, copy the CA cert
+scp pi@[ATOS_PI_IP]:/root/.local/share/mkcert/rootCA.pem .
+
+# Copy to FullPageOS
+scp rootCA.pem pi@[FULLPAGEOS_IP]:~/
+```
+
+2. **Install CA certificate on FullPageOS:**
+```bash
+# SSH into FullPageOS
+ssh pi@[FULLPAGEOS_IP]
+
+# Install the CA certificate
+sudo cp rootCA.pem /usr/local/share/ca-certificates/atos-tak-ca.crt
+sudo update-ca-certificates
+
+# Restart Chromium
+sudo reboot
+```
+
+3. **Update kiosk URL to HTTPS:**
+```bash
+sudo nano /home/pi/.config/lxsession/LXDE-pi/autostart
+# Change to: @chromium-browser --kiosk https://[ATOS_PI_IP]/display
+```
+
+### Troubleshooting FullPageOS
+- **Certificate warnings:** Install the mkcert CA certificate
+- **Network issues:** Check FullPageOS network configuration
+- **Display issues:** Verify HDMI settings in FullPageOS config
+- **Auto-refresh:** FullPageOS will automatically refresh the page
+
+## 🛡️ Admin Panel & Database Management
+
+### Accessing the Admin Panel
+- **URL:** `http://[PI_IP]:5000/admin` or `https://[PI_IP]/admin`
+- **Hidden:** No navigation links from other pages
+- **Password:** Required if HTTPS is enabled, no password if HTTP only
+
+### Database Operations
+
+#### Download Current Database
+- **Purpose:** Backup the active SQLite database
+- **Format:** `.db` file with all current data
+- **Use case:** Offline analysis, backup before major operations
+
+#### Archive & Clear Database
+- **Purpose:** Create timestamped backup and start fresh
+- **Process:** 
+  1. Creates backup in `database_archives/` directory
+  2. Clears current database
+  3. Starts fresh data collection
+- **Use case:** Regular maintenance, before major operations
+
+#### Clear All Data
+- **Purpose:** Permanently delete all data from current database
+- **Warning:** Irreversible operation
+- **Use case:** Complete reset, troubleshooting
+
+#### Clear Old Data
+- **Purpose:** Remove data older than specified days
+- **Input:** Number of days to keep
+- **Use case:** Disk space management, performance optimization
+
+#### Cleanup Invalid Tags
+- **Purpose:** Remove data from tags outside range 1-100
+- **Process:** Deletes records for invalid tag IDs
+- **Use case:** Database maintenance, cleanup after testing
+
+### Archive Management
+
+#### View Archives
+- **Location:** `database_archives/` directory
+- **Information:** Timestamp, file size, record count
+- **Format:** `atos_events_YYYYMMDD_HHMMSS.db`
+
+#### Download Archives
+- **Purpose:** Retrieve specific historical database
+- **Use case:** Analysis of past data, recovery
+
+#### Load Archives
+- **Options:** Merge or overwrite current database
+- **Merge:** Combines current and archived data (schema-aware)
+- **Overwrite:** Replaces current database with archive
+- **Use case:** Data recovery, historical analysis
+
+### Database Information Display
+- **Record Counts:** Total and per-tag breakdown
+- **File Sizes:** Current database and archive sizes
+- **Date Ranges:** Oldest and newest data timestamps
+- **Tag Statistics:** Visual grid showing record counts for tags 1-100
+
+### Best Practices
+1. **Stop service before major operations:** `sudo systemctl stop atos-tdma`
+2. **Backup before overwrite operations:** Automatic backup is created
+3. **Monitor disk space:** Archives can accumulate over time
+4. **Regular maintenance:** Archive old data periodically
+5. **Test operations:** Use small datasets for testing
+
+### Troubleshooting Admin Operations
+
+#### Database Locked Errors
+```bash
+# Stop the service first
+sudo systemctl stop atos-tdma
+
+# Wait a moment
+sleep 2
+
+# Try admin operation again
+# Then restart service
+sudo systemctl start atos-tdma
+```
+
+#### Schema Mismatch During Merge
+- **Cause:** Different database schemas between current and archive
+- **Solution:** Schema-aware merging automatically matches columns by name
+- **Prevention:** Use archives from same version of the application
+
+#### Archive Deletion Confirmation
+```bash
+# Check archives directory
+ls -la database_archives/
+
+# Verify before deletion
+# Archives are permanently deleted when using Delete button
+```
 
 ## 🔧 Configuration
 
@@ -223,28 +503,6 @@ hostname -I
 - **Export Options:** CSV and KML export for external analysis
 - **Tag Filtering:** Only stores data for tags 1-100 (invalid tags automatically filtered)
 
-### Admin Panel (Hidden)
-The admin panel at `http://[PI_IP]:5000/admin` provides advanced database management:
-
-#### Database Operations
-- **Download Current DB:** Download the active SQLite database
-- **Archive & Clear:** Create timestamped backup and start fresh database
-- **Clear All Data:** Permanently delete all data from database
-- **Clear Old Data:** Remove data older than specified days
-- **Cleanup Invalid Tags:** Remove data from tags outside 1-100 range
-
-#### Archive Management
-- **View Archives:** List all archived databases with timestamps and sizes
-- **Download Archives:** Download any archived database
-- **Load Archives:** Merge or overwrite current database with archived data
-- **Automatic Backup:** Current database backed up before overwrite operations
-
-#### Database Information
-- **Record Counts:** Total records and per-tag breakdown
-- **File Sizes:** Database and archive file sizes
-- **Date Ranges:** Oldest and newest data timestamps
-- **Tag Statistics:** Visual grid showing record counts for tags 1-100
-
 ### Viewing Logs
 ```bash
 # Real-time service logs
@@ -282,6 +540,18 @@ sudo systemctl status atos-tdma
 # Backup current configuration
 cp forwarding_config.json forwarding_config_backup.json
 cp tak_server_config.json tak_server_config_backup.json
+```
+
+### Certificate Renewal
+```bash
+# Check certificate expiration
+openssl x509 -in /etc/ssl/atos-tak/atos-tak.crt -text -noout | grep "Not After"
+
+# Renew certificate (if needed)
+mkcert -key-file /etc/ssl/atos-tak/atos-tak.key -cert-file /etc/ssl/atos-tak/atos-tak.crt "$(hostname)" "$(hostname -I | awk '{print $1}')" "localhost" "127.0.0.1"
+
+# Restart nginx
+sudo systemctl restart nginx
 ```
 
 ## 🚨 Troubleshooting
@@ -351,6 +621,30 @@ sudo tcpdump -i any -n udp dst 239.2.3.1 and port 6969 -X
 sudo systemctl status atos-tdma | grep multicast
 
 # Verify multicast configuration in web interface
+```
+
+#### 6. HTTPS Issues
+```bash
+# Check nginx status
+sudo systemctl status nginx
+
+# Test nginx configuration
+sudo nginx -t
+
+# Check SSL certificate
+openssl x509 -in /etc/ssl/atos-tak/atos-tak.crt -text -noout
+
+# Check nginx logs
+sudo tail -f /var/log/nginx/error.log
+```
+
+#### 7. Admin Panel Issues
+```bash
+# Check if password is set (HTTPS mode)
+grep -A 1 "_get_admin_password_hash" marshall_tak_tdma.py
+
+# Reset admin password (if needed)
+# Edit marshall_tak_tdma.py and update the password hash
 ```
 
 ## 📡 TAK Integration
@@ -426,8 +720,16 @@ Save and load different configurations:
 
 ### Access Control
 - **Local access:** Web interface accessible on local network
-- **Authentication:** Consider adding authentication for production use
+- **Admin authentication:** Password protection for database operations (HTTPS mode)
 - **HTTPS:** Use reverse proxy for HTTPS in production
+- **Certificate management:** Regular renewal of mkcert certificates
+
+### Best Practices
+- **Use HTTPS:** Enable mkcert for secure LAN access
+- **Strong passwords:** Use complex admin passwords
+- **Regular updates:** Keep system and certificates updated
+- **Backup data:** Regular database archiving
+- **Monitor access:** Check logs for unauthorized access
 
 ## 📞 Support
 
@@ -456,21 +758,33 @@ ping [TAK_SERVER_IP]
 
 # Multicast monitoring
 sudo tcpdump -i any -n udp port 6969 -X
+
+# HTTPS certificate check
+openssl x509 -in /etc/ssl/atos-tak/atos-tak.crt -text -noout
+
+# nginx status
+sudo systemctl status nginx
+sudo nginx -t
 ```
 
 ## 📝 Version History
 
-### Current Version: TDMA Optimized
+### Current Version: TDMA Optimized with Admin Panel
 - **Deterministic TDMA scheduling (2-second default interval)**
 - **Multicast support with configurable intervals**
-- **Database integration**
-- **Advanced rate limiting**
-- **Comprehensive logging**
+- **Database integration with SQLite storage**
+- **Advanced rate limiting and packet processing**
+- **Comprehensive logging and monitoring**
 - **Web dashboard with database interface**
+- **Hidden admin panel with password protection**
+- **HTTPS support with mkcert and nginx**
+- **FullPageOS kiosk mode integration**
 - **TAK integration (default port 8686)**
 - **Configuration persistence across reboots**
 - **Improved multicast control interface**
+- **Database management operations (archive, merge, clear)**
+- **Template system for configuration management**
 
 ---
 
-**Note:** This system is designed for reliable ATOS tracker environments with deterministic scheduling. The TDMA approach ensures fair access and prevents packet collisions. All configuration changes are automatically saved and persist across system reboots.
+**Note:** This system is designed for reliable ATOS tracker environments with deterministic scheduling. The TDMA approach ensures fair access and prevents packet collisions. All configuration changes are automatically saved and persist across system reboots. The admin panel provides comprehensive database management capabilities for production deployments.
