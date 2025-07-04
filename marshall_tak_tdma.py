@@ -26,6 +26,7 @@ import atos_sqlite
 import io
 import csv
 from dateutil import parser as dateparser
+import sqlite3
 
 app = Flask(__name__)
 
@@ -1215,7 +1216,11 @@ def api_admin_load_archive():
             return jsonify({'error': 'Archive file not found'}), 404
         current_db_path = atos_sqlite.get_db_path()
         if action == 'overwrite':
-            backup_path = Path(current_db_path).with_suffix('.db.backup')
+            # Archive current DB before overwrite
+            archive_dir = Path('database_archives')
+            archive_dir.mkdir(exist_ok=True)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_path = archive_dir / f'atos_events_overwrite_backup_{timestamp}.db'
             import shutil
             shutil.copy2(current_db_path, backup_path)
             shutil.copy2(archive_path, current_db_path)
@@ -1226,20 +1231,23 @@ def api_admin_load_archive():
                 'backup_created': backup_path.name
             })
         elif action == 'merge':
-            import sqlite3
+            # Schema-aware merge
             with sqlite3.connect(current_db_path) as current_conn, sqlite3.connect(archive_path) as archive_conn:
-                archive_data = archive_conn.execute('SELECT * FROM tag_events').fetchall()
+                # Get column names for both tables
+                current_cols = [row[1] for row in current_conn.execute("PRAGMA table_info(tag_events)").fetchall()]
+                archive_cols = [row[1] for row in archive_conn.execute("PRAGMA table_info(tag_events)").fetchall()]
+                # Use only columns present in both
+                common_cols = [col for col in archive_cols if col in current_cols]
+                print(f'[ADMIN] Load Archive: Common columns: {common_cols}')
+                # Build SELECT and INSERT statements
+                select_sql = f"SELECT {', '.join(common_cols)} FROM tag_events"
+                insert_sql = f"INSERT OR IGNORE INTO tag_events ({', '.join(common_cols)}) VALUES ({', '.join(['?']*len(common_cols))})"
+                archive_data = archive_conn.execute(select_sql).fetchall()
                 print(f'[ADMIN] Load Archive: Merging {len(archive_data)} records from archive')
                 cursor = current_conn.cursor()
                 for row in archive_data:
                     try:
-                        cursor.execute('''
-                            INSERT OR IGNORE INTO tag_events 
-                            (timestamp, tag_id, latitude, longitude, altitude_ft, battery_voltage, 
-                             temperature, pdop, wire_status, object_status, emergency, is_fresh, 
-                             bad_gps, tak_ip, tak_port, cot_xml, event_type)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', row)
+                        cursor.execute(insert_sql, row)
                     except Exception as row_e:
                         print(f'[ADMIN] Load Archive: ERROR inserting row: {row_e}')
                 current_conn.commit()
