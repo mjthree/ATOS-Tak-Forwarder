@@ -1147,6 +1147,47 @@ def admin_login():
 def admin_page():
     return render_template('admin.html')
 
+@app.route('/api/admin/db_info')
+@admin_required
+def api_admin_db_info():
+    try:
+        with atos_sqlite.get_db() as conn:
+            # Get total record count
+            total_records = conn.execute('SELECT COUNT(*) as count FROM tag_events').fetchone()['count']
+            # Get record count by tag_id (1-100 only)
+            tag_counts = {}
+            for tag_id in range(1, 101):
+                count = conn.execute('SELECT COUNT(*) as count FROM tag_events WHERE tag_id = ?', (tag_id,)).fetchone()['count']
+                if count > 0:
+                    tag_counts[tag_id] = count
+            # Get date range
+            date_range = conn.execute('SELECT MIN(timestamp) as min_ts, MAX(timestamp) as max_ts FROM tag_events').fetchone()
+            # Get database file size
+            db_path = atos_sqlite.get_db_path()
+            file_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+            # Get archived databases
+            archive_dir = Path('database_archives')
+            archive_dir.mkdir(exist_ok=True)
+            archived_dbs = []
+            for db_file in archive_dir.glob('*.db'):
+                archived_dbs.append({
+                    'name': db_file.name,
+                    'size': os.path.getsize(db_file),
+                    'modified': datetime.fromtimestamp(os.path.getmtime(db_file)).isoformat()
+                })
+            return jsonify({
+                'total_records': total_records,
+                'tag_counts': tag_counts,
+                'date_range': {
+                    'min': date_range['min_ts'],
+                    'max': date_range['max_ts']
+                },
+                'file_size': file_size,
+                'archived_databases': archived_dbs
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # Protect all admin API endpoints
 def protect_admin_api():
     from flask import request
