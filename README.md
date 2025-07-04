@@ -788,3 +788,39 @@ sudo nginx -t
 ---
 
 **Note:** This system is designed for reliable ATOS tracker environments with deterministic scheduling. The TDMA approach ensures fair access and prevents packet collisions. All configuration changes are automatically saved and persist across system reboots. The admin panel provides comprehensive database management capabilities for production deployments.
+
+## 🔑 Changing the Admin Password (CLI Only)
+
+The admin password for the hidden admin panel is stored as a SHA-256 hash in `marshall_tak_tdma.py`. For security, password changes must be performed via the command line (CLI) on the device itself.
+
+### How to Change the Admin Password
+
+1. **Stop the ATOS service:**
+   ```bash
+   sudo systemctl stop atos-tdma
+   ```
+2. **Run the following Python snippet to generate a new hash:**
+   ```bash
+   python3 -c "import hashlib; print(hashlib.sha256('NEWPASSWORD'.encode('utf-8')).hexdigest())"
+   ```
+   Replace `NEWPASSWORD` with your desired password.
+
+3. **Edit `marshall_tak_tdma.py`:**
+   ```bash
+   nano marshall_tak_tdma.py
+   ```
+   Find the function:
+   ```python
+   def _get_admin_password_hash():
+       return '...'
+   ```
+   Replace the value in `return '...'` with the new hash from step 2 (keep the quotes).
+
+4. **Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).**
+
+5. **Restart the ATOS service:**
+   ```bash
+   sudo systemctl start atos-tdma
+   ```
+
+**Note:** The password is never stored in plain text. Only the hash is stored in the code. This method ensures only users with CLI access to the device can change the admin password.
