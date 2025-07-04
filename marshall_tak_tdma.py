@@ -1215,7 +1215,7 @@ def api_admin_download_db():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/admin/archive_db')
+@app.route('/api/admin/archive_db', methods=['POST'])
 def api_admin_archive_db():
     """Archive the current database and start a new one"""
     try:
