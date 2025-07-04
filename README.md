@@ -188,6 +188,7 @@ hostname -I
   "multicast_port": 6969,
   "send_interval": 10,
   "tdma_interval": 10,
+  "multicast_interval": 2,
   "disable_multicast": false
 }
 ```
@@ -195,6 +196,7 @@ hostname -I
 ### TDMA Settings
 - **tdma_interval:** Time in seconds for complete tag cycle (default: 10)
 - **send_interval:** Time in seconds between multicast broadcasts (default: 10)
+- **multicast_interval:** Time in seconds between multicast broadcasts (default: 2)
 - **TAG_RATE_LIMIT:** 1 second (minimum time between updates per tag)
 - **STALE_SECONDS:** 60 seconds (when to mark tag as stale)
 
@@ -338,7 +340,9 @@ The forwarder sends standard CoT messages with custom ATOS extensions:
 ### Multicast Support
 - **UDP 6969:** Standard ATAK multicast port
 - **Address:** 239.2.3.1 (standard TAK multicast)
-- **Automatic:** All COT messages sent to both TAK server and multicast
+- **Configurable Interval:** User can set multicast broadcast interval (1-15 seconds)
+- **Independent Operation:** Multicast operates separately from TDMA scheduling
+- **All Active Tags:** Sends all non-stale, forwarded tags in each multicast batch
 
 ## 🎯 Advanced Features
 

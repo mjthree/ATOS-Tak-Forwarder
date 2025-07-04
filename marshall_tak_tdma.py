@@ -96,7 +96,7 @@ def save_forwarding_config(cfg):
 
 def load_tak_config():
     if not os.path.exists(TAK_SERVER_CONFIG_FILE):
-        cfg = {'ip': '192.168.200.11', 'port': 8087, 'send_interval': 10, 'multicast_port': 6969, 'tdma_interval': 10, 'disable_multicast': False}
+        cfg = {'ip': '192.168.200.11', 'port': 8686, 'send_interval': 10, 'multicast_port': 6969, 'tdma_interval': 2, 'multicast_interval': 2, 'disable_multicast': False}
         with open(TAK_SERVER_CONFIG_FILE, 'w') as f:
             json.dump(cfg, f, indent=2)
         return cfg
@@ -107,7 +107,9 @@ def load_tak_config():
     if 'multicast_port' not in cfg:
         cfg['multicast_port'] = 6969
     if 'tdma_interval' not in cfg:
-        cfg['tdma_interval'] = 10
+        cfg['tdma_interval'] = 2
+    if 'multicast_interval' not in cfg:
+        cfg['multicast_interval'] = 2
     if 'disable_multicast' not in cfg:
         cfg['disable_multicast'] = False
     save_tak_config(cfg)
@@ -644,13 +646,18 @@ def multicast_batch_loop():
     print("🚀 Multicast batch loop started")
     tak_client = OptimizedTAKClient()
     while True:
-        interval = tak_server_config.get('send_interval', 10)
-        time.sleep(interval)
+        multicast_interval = tak_server_config.get('multicast_interval', 2)
+        time.sleep(multicast_interval)  # Configurable interval for multicast
         if tak_server_config.get('disable_multicast', False):
+            print("📡 Multicast disabled, skipping...")
             continue
+        
         batch_messages = []
         with TAG_DATA_LOCK:
             tag_items = list(tag_data.items())
+        
+        print(f"📡 Preparing multicast batch with {len(tag_items)} total tags")
+        
         for tag_id, tag in tag_items:
             if get_tag_staleness(tag):
                 continue
@@ -661,12 +668,15 @@ def multicast_batch_loop():
             tag_to_send = tag.copy()
             tag_to_send['color'] = cfg.get('color', 'white')
             tag_to_send['track_type'] = cfg.get('track_type', 'PAX')
-            callsign = cfg.get('callsign') or tag_id
+            callsign = cfg.get('callsign') or str(tag_id)
             tag_to_send['callsign'] = callsign
             batch_messages.append((tag_id, tag_to_send, callsign))
 
         if batch_messages:
+            print(f"📡 Sending multicast batch with {len(batch_messages)} tags")
             tak_client.send_batch(batch_messages, send_to_server=False, send_to_multicast=True)
+        else:
+            print("📡 No tags to send in multicast batch")
 
 # ==== Optimized Serial Reader ====
 def serial_reader():
@@ -821,6 +831,11 @@ def api_tak_server():
     if 'tdma_interval' in data:
         try:
             tak_server_config['tdma_interval'] = int(data.get('tdma_interval'))
+        except (TypeError, ValueError):
+            pass
+    if 'multicast_interval' in data:
+        try:
+            tak_server_config['multicast_interval'] = int(data.get('multicast_interval'))
         except (TypeError, ValueError):
             pass
     if 'disable_multicast' in data:
