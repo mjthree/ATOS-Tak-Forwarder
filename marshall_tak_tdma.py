@@ -463,9 +463,13 @@ class OptimizedTAKClient:
         sent_count = 0
         for tag_id, tag_data, callsign in batch_messages:
             try:
-                cot_message = self.create_cot_message(str(tag_id), tag_data, callsign)
+                try:
+                    cot_message = self.create_cot_message(str(tag_id), tag_data, callsign)
+                except Exception as e:
+                    print(f"[ERROR] Exception in create_cot_message for tag {tag_id} (callsign: {callsign}): {e}\nData: {tag_data}")
+                    continue
                 if cot_message:
-                    print(cot_message.decode('utf-8', errors='replace'))  # Print COT XML before sending
+                    print(f"[COT XML for tag {tag_id}]:\n{cot_message.decode('utf-8', errors='replace')}")  # Print COT XML before sending
 
                     if send_to_server:
                         self.sock.sendto(cot_message, (host, port))
@@ -483,6 +487,8 @@ class OptimizedTAKClient:
 
                     sent_count += 1
                     log_tak_forward(tag_id, tag_data, tak_server_config, cot_message)
+                else:
+                    print(f"[ERROR] No COT XML generated for tag {tag_id} (callsign: {callsign}, data: {tag_data})")
             except Exception as e:
                 print(f"Error sending tag {tag_id}: {e}")
 
