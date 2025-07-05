@@ -293,6 +293,9 @@ function drawChart() {
             spanGaps: true,
         });
     });
+    // Debug log for chart data
+    console.log('Chart labels:', sortedLabels);
+    console.log('Chart datasets:', datasets);
     // Dynamic Y-axis scaling
     let yMin = Math.min(...allAltitudes);
     let yMax = Math.max(...allAltitudes);
