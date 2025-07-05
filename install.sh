@@ -170,17 +170,20 @@ print(f"Password hash: {password_hash}")
 with open('marshall_tak_tdma.py', 'r') as f:
     content = f.read()
 
-# Replace the password hash
-content = content.replace(
-    "def _get_admin_password_hash():",
-    f"def _get_admin_password_hash():\n    return '{password_hash}'"
-)
+# Replace the hardcoded password in the function
+old_line = "    return hashlib.sha256('apex123APEX!@#'.encode('utf-8')).hexdigest()"
+new_line = f"    return hashlib.sha256('{password}'.encode('utf-8')).hexdigest()"
+
+if old_line in content:
+    content = content.replace(old_line, new_line)
+    print("✅ Password updated in marshall_tak_tdma.py")
+else:
+    print("❌ Could not find password line to update")
+    sys.exit(1)
 
 # Write back
 with open('marshall_tak_tdma.py', 'w') as f:
     f.write(content)
-
-print("✅ Password updated in marshall_tak_tdma.py")
 PYTHON_EOF
 
         python3 /tmp/update_password.py "$admin_password"
@@ -268,6 +271,9 @@ echo "🎯 APEX SHIELD - ATOS TDMA Service Ready!"
 echo ""
 echo "📚 New Features Available:"
 echo "   🔐 Admin Panel: Database management and operations"
+echo "     - Archive, download, clear, and merge databases"
+echo "     - Clean up old data and invalid tags"
+echo "     - Manage archived database files"
 echo "   📊 Database Interface: Historical data analysis and export"
 echo "   🔒 Password Protection: Secure admin access (if HTTPS enabled)"
 echo "   📈 Advanced Logging: SQLite database with comprehensive tracking"
