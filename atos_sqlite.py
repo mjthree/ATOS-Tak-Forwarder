@@ -57,11 +57,16 @@ def insert_tag_event(**kwargs):
         timestamp = datetime.utcnow().replace(microsecond=int(datetime.utcnow().microsecond/1000)*1000).isoformat(timespec='milliseconds') + 'Z'
     else:
         try:
-            ts = datetime.fromisoformat(timestamp.replace('Z','').replace(' ','T'))
+            # Ensure timestamp is in UTC format
+            if timestamp.endswith('Z'):
+                ts = datetime.fromisoformat(timestamp[:-1])
+            else:
+                ts = datetime.fromisoformat(timestamp.replace(' ','T'))
             ts = ts.replace(microsecond=int(ts.microsecond/1000)*1000)
             timestamp = ts.isoformat(timespec='milliseconds') + 'Z'
         except Exception:
-            pass
+            # If parsing fails, use current UTC time
+            timestamp = datetime.utcnow().replace(microsecond=int(datetime.utcnow().microsecond/1000)*1000).isoformat(timespec='milliseconds') + 'Z'
     # Strict type validation/coercion
     def safe_float(val):
         return float(val) if val not in (None, "") else None

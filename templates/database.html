@@ -327,7 +327,7 @@ function drawChart() {
             scales: {
                 x: {
                     type: 'category',
-                    title: { display: true, text: 'Time (MST)' },
+                    title: { display: true, text: 'Time (MST - converted from UTC)' },
                     ticks: {
                         callback: function(value, index, ticks) {
                             return formatMSTTime(value);
@@ -398,17 +398,15 @@ function setupSlider() {
     sliderDiv.innerHTML = '';
     const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
     if (!selected.length) return;
-    // Use all timestamps from all selected tags
+    // Use all timestamps from all selected tags (UTC timestamps)
     let allTimestamps = [];
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
-        allTimestamps = allTimestamps.concat(dataArr.map(d => new Date(d.timestamp).getTime()));
+        allTimestamps = allTimestamps.concat(dataArr.map(d => d.timestamp));
     });
     if (allTimestamps.length < 2) return;
-    allTimestamps.sort((a, b) => a - b);
-    const minTs = allTimestamps[0];
-    const maxTs = allTimestamps[allTimestamps.length - 1];
-    const sliderLabels = allTimestamps.sort().map(ts => ts); // MST timestamp strings
+    allTimestamps.sort();
+    const sliderLabels = allTimestamps; // UTC timestamp strings
     sliderDiv.innerHTML = '<div id="slider-el"></div>';
     slider = document.getElementById('slider-el');
     noUiSlider.create(slider, {
@@ -436,25 +434,31 @@ function zoomChartToSlider() {
     const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
     if (!slider || !selected.length) return;
     let [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
+    
+    // Get all timestamps from selected tags
+    let allTimestamps = [];
+    selected.forEach(tagId => {
+        const dataArr = tagData[tagId] || [];
+        allTimestamps = allTimestamps.concat(dataArr.map(d => d.timestamp));
+    });
+    allTimestamps.sort();
+    
+    if (allTimestamps.length < 2) return;
+    
     // Clamp indices to valid range
-    startIdx = Math.max(0, Math.min(startIdx, tagData.length - 1));
-    endIdx = Math.max(0, Math.min(endIdx, tagData.length - 1));
+    startIdx = Math.max(0, Math.min(startIdx, allTimestamps.length - 1));
+    endIdx = Math.max(0, Math.min(endIdx, allTimestamps.length - 1));
     if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
-    let start = tagData[startIdx]?.timestamp;
-    let end = tagData[endIdx]?.timestamp;
-    // Fallback if indices are still invalid
-    if (!start) start = tagData[0]?.timestamp;
-    if (!end) end = tagData[tagData.length-1]?.timestamp;
-    console.log('Slider:', slider, 'tagData.length:', tagData.length);
-    console.log('Slider get:', slider ? slider.noUiSlider.get() : null);
-    console.log('tagData[0]:', tagData[0], 'tagData[tagData.length-1]:', tagData[tagData.length-1]);
-    console.log('Computed start/end:', start, end);
+    
+    let start = allTimestamps[startIdx];
+    let end = allTimestamps[endIdx];
+    
+    console.log('Slider range:', start, end);
     let allLabels = new Set();
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
         dataArr.forEach(d => {
-            const t = new Date(d.timestamp).getTime();
-            if (t >= start && t <= end) allLabels.add(d.timestamp);
+            if (d.timestamp >= start && d.timestamp <= end) allLabels.add(d.timestamp);
         });
     });
     const sortedLabels = Array.from(allLabels).sort();
@@ -507,7 +511,7 @@ function zoomChartToSlider() {
             scales: {
                 x: {
                     type: 'category',
-                    title: { display: true, text: 'Time (MST)' },
+                    title: { display: true, text: 'Time (MST - converted from UTC)' },
                     ticks: {
                         callback: function(value, index, ticks) {
                             return formatMSTTime(value);
@@ -522,21 +526,29 @@ function zoomChartToSlider() {
 }
 
 function getSliderTimeRange() {
-    if (!slider || tagData.length < 2) return [null, null];
+    if (!slider) return [null, null];
     let [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
+    
+    // Get all timestamps from selected tags
+    const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
+    let allTimestamps = [];
+    selected.forEach(tagId => {
+        const dataArr = tagData[tagId] || [];
+        allTimestamps = allTimestamps.concat(dataArr.map(d => d.timestamp));
+    });
+    allTimestamps.sort();
+    
+    if (allTimestamps.length < 2) return [null, null];
+    
     // Clamp indices to valid range
-    startIdx = Math.max(0, Math.min(startIdx, tagData.length - 1));
-    endIdx = Math.max(0, Math.min(endIdx, tagData.length - 1));
+    startIdx = Math.max(0, Math.min(startIdx, allTimestamps.length - 1));
+    endIdx = Math.max(0, Math.min(endIdx, allTimestamps.length - 1));
     if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
-    let start = tagData[startIdx]?.timestamp;
-    let end = tagData[endIdx]?.timestamp;
-    // Fallback if indices are still invalid
-    if (!start) start = tagData[0]?.timestamp;
-    if (!end) end = tagData[tagData.length-1]?.timestamp;
-    console.log('Slider:', slider, 'tagData.length:', tagData.length);
-    console.log('Slider get:', slider ? slider.noUiSlider.get() : null);
-    console.log('tagData[0]:', tagData[0], 'tagData[tagData.length-1]:', tagData[tagData.length-1]);
-    console.log('Computed start/end:', start, end);
+    
+    let start = allTimestamps[startIdx];
+    let end = allTimestamps[endIdx];
+    
+    console.log('Slider timestamps:', start, end);
     return [start, end];
 }
 
@@ -625,16 +637,30 @@ window.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// Helper to extract and format time as 12-hour with AM/PM from MST timestamp string (no Date() used)
-function formatMSTTime(ts) {
-    if (typeof ts !== 'string') return '';
-    const match = ts.match(/T(\d{2}):(\d{2}):(\d{2})/);
-    if (match) {
-        let hour = +match[1] % 12 || 12;
-        let ampm = +match[1] < 12 ? 'AM' : 'PM';
-        return `${hour}:${match[2]} ${ampm}`;
+// Helper to convert UTC timestamp to MST and format as 12-hour with AM/PM
+function formatMSTTime(utcTimestamp) {
+    if (typeof utcTimestamp !== 'string') return '';
+    try {
+        const date = new Date(utcTimestamp);
+        if (isNaN(date.getTime())) return utcTimestamp;
+        
+        const mstTime = date.toLocaleString('en-US', {
+            timeZone: 'America/Phoenix',
+            hour12: true,
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+        return mstTime;
+    } catch (e) {
+        // Fallback to simple extraction if conversion fails
+        const match = utcTimestamp.match(/T(\d{2}):(\d{2}):(\d{2})/);
+        if (match) {
+            let hour = +match[1] % 12 || 12;
+            let ampm = +match[1] < 12 ? 'AM' : 'PM';
+            return `${hour}:${match[2]} ${ampm}`;
+        }
+        return utcTimestamp;
     }
-    return ts;
 }
 
 fetchTags();

@@ -429,7 +429,7 @@ def initialize_log_files():
 def log_tak_forward(tag_id, tag, tak_cfg, cot_message: bytes):
     try:
         atos_sqlite.insert_tag_event(
-            timestamp=datetime.now().isoformat(),
+            timestamp=datetime.utcnow().isoformat(timespec='milliseconds') + 'Z',
             tag_id=tag_id,
             latitude=tag.get('latitude'),
             longitude=tag.get('longitude'),
@@ -537,7 +537,7 @@ def parse_fourty_packet(pkt):
             'emergency': emergency,
             'is_fresh': is_fresh,
             'bad_gps': bad_gps,
-            'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
+            'timestamp': datetime.utcnow().isoformat(timespec='milliseconds') + 'Z',
             'timestamp_epoch': time.time()
         }
     except Exception as e:
@@ -552,7 +552,7 @@ def parse_fiftysix_packet(pkt):
         return {
             'type': 'FIFTYSIX',
             'battery_percent': battery_percent,
-            'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
+            'timestamp': datetime.utcnow().isoformat(timespec='milliseconds') + 'Z',
             'timestamp_epoch': time.time()
         }
     except Exception as e:
@@ -1341,19 +1341,22 @@ def api_db_tag_data():
                     if alt_ft is not None:
                         alt_ft = round(alt_ft, 1)
                     ts = row['timestamp']
-                    # Ensure millisecond UTC ISO format and convert to MST
+                    # Ensure millisecond UTC ISO format (no timezone conversion)
                     if ts:
                         try:
                             dt = datetime.fromisoformat(ts.replace('Z','').replace(' ','T'))
                             dt = dt.replace(tzinfo=timezone.utc)
-                            utc_ts = dt.isoformat(timespec='milliseconds').replace('+00:00','Z')
-                            # Convert UTC to MST
-                            ts = convert_utc_to_mst(utc_ts)
+                            ts = dt.isoformat(timespec='milliseconds').replace('+00:00','Z')
                         except Exception:
                             if not ts.endswith('Z'):
                                 ts = ts.replace(' ', 'T') + 'Z'
-                            # Still try to convert to MST
-                            ts = convert_utc_to_mst(ts)
+                            # Ensure it's in UTC format
+                            try:
+                                dt = datetime.fromisoformat(ts.replace('Z','').replace(' ','T'))
+                                dt = dt.replace(tzinfo=timezone.utc)
+                                ts = dt.isoformat(timespec='milliseconds').replace('+00:00','Z')
+                            except Exception:
+                                pass  # Keep original if conversion fails
                     data.append({'timestamp': ts, 'altitude_ft': alt_ft})
                 result[tag_id] = data
         return jsonify(result)
@@ -1401,15 +1404,19 @@ def api_db_export_csv():
         writer.writerow(['timestamp', 'altitude_ft', 'altitude_agl'])
         for row in rows:
             agl = max(0, row['altitude_ft'] - dz_altitude)
-            # Convert UTC timestamp to MST for CSV
-            utc_ts = row['timestamp'].replace(' ','T') + 'Z'
+            # Convert UTC timestamp to MST for CSV export
+            utc_ts = row['timestamp']
+            if not utc_ts.endswith('Z'):
+                utc_ts = utc_ts.replace(' ','T') + 'Z'
             mst_ts = convert_utc_to_mst(utc_ts)
             writer.writerow([mst_ts, row['altitude_ft'], agl])
     else:
         writer.writerow(['timestamp', 'altitude_ft'])
         for row in rows:
-            # Convert UTC timestamp to MST for CSV
-            utc_ts = row['timestamp'].replace(' ','T') + 'Z'
+            # Convert UTC timestamp to MST for CSV export
+            utc_ts = row['timestamp']
+            if not utc_ts.endswith('Z'):
+                utc_ts = utc_ts.replace(' ','T') + 'Z'
             mst_ts = convert_utc_to_mst(utc_ts)
             writer.writerow([mst_ts, row['altitude_ft']])
     output.seek(0)
@@ -1521,8 +1528,10 @@ def api_db_export_kml():
                 if row['latitude'] == 9999999.0 or row['longitude'] == 9999999.0:
                     continue
                 alt = max(0, row['altitude_ft'] - dz_altitude) if dz_altitude is not None else row['altitude_ft']
-                # Convert UTC timestamp to MST for KML
-                utc_ts = row['timestamp'].replace(' ','T') + 'Z'
+                # Convert UTC timestamp to MST for KML export
+                utc_ts = row['timestamp']
+                if not utc_ts.endswith('Z'):
+                    utc_ts = utc_ts.replace(' ','T') + 'Z'
                 mst_ts = convert_utc_to_mst(utc_ts)
                 whens.append(f"<when>{mst_ts}</when>")
                 gx_coords.append(f"<gx:coord>{row['longitude']} {row['latitude']} {alt}</gx:coord>")
