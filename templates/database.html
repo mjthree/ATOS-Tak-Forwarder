@@ -315,9 +315,29 @@ function drawChart() {
             responsive: true,
             plugins: {
                 legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            // context[0].label is the ISO string
+                            const d = new Date(context[0].label);
+                            return d.toLocaleString();
+                        }
+                    }
+                }
             },
             scales: {
-                x: { type: 'time', time: { unit: 'second' }, title: { display: true, text: 'Time' } },
+                x: {
+                    type: 'time',
+                    time: { unit: 'second' },
+                    title: { display: true, text: 'Time' },
+                    ticks: {
+                        callback: function(value, index, ticks) {
+                            // value is a timestamp (ms since epoch)
+                            const d = new Date(this.getLabelForValue(value));
+                            return d.toLocaleTimeString();
+                        }
+                    }
+                },
                 y: { title: { display: true, text: 'Altitude (ft)' }, min: yMin, max: yMax }
             }
         }
@@ -468,9 +488,29 @@ function zoomChartToSlider() {
             responsive: true,
             plugins: {
                 legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            // context[0].label is the ISO string
+                            const d = new Date(context[0].label);
+                            return d.toLocaleString();
+                        }
+                    }
+                }
             },
             scales: {
-                x: { type: 'time', time: { unit: 'second' }, title: { display: true, text: 'Time' } },
+                x: {
+                    type: 'time',
+                    time: { unit: 'second' },
+                    title: { display: true, text: 'Time' },
+                    ticks: {
+                        callback: function(value, index, ticks) {
+                            // value is a timestamp (ms since epoch)
+                            const d = new Date(this.getLabelForValue(value));
+                            return d.toLocaleTimeString();
+                        }
+                    }
+                },
                 y: { title: { display: true, text: 'Altitude (ft)' }, min: yMin, max: yMax }
             }
         }
