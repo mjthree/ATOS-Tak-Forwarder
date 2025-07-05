@@ -210,6 +210,11 @@ let sliderReady = false;
 let dataReady = false;
 let minutesBack = 30;
 
+function normalizeTimestamp(ts) {
+    // If already ends with Z, return as is; else add Z
+    return ts.endsWith('Z') ? ts : ts + 'Z';
+}
+
 function fetchTags() {
     fetch('/api/db/tags').then(r => r.json()).then(tags => {
         tagList = tags;
@@ -264,7 +269,7 @@ function drawChart() {
     let allLabels = new Set();
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
-        dataArr.forEach(d => allLabels.add(d.timestamp));
+        dataArr.forEach(d => allLabels.add(normalizeTimestamp(d.timestamp)));
     });
     const sortedLabels = Array.from(allLabels).sort();
     let datasets = [];
@@ -272,9 +277,9 @@ function drawChart() {
     selected.forEach((tagId, idx) => {
         const color = TAG_COLORS[idx % TAG_COLORS.length].color;
         const dataArr = tagData[tagId] || [];
-        // Map timestamps to altitudes for this tag
+        // Map normalized timestamps to altitudes for this tag
         const tsToAlt = {};
-        dataArr.forEach(d => { tsToAlt[d.timestamp] = Number(d.altitude_ft); });
+        dataArr.forEach(d => { tsToAlt[normalizeTimestamp(d.timestamp)] = Number(d.altitude_ft); });
         // Align data to master label list
         const altitudes = sortedLabels.map(ts => tsToAlt.hasOwnProperty(ts) ? tsToAlt[ts] : null);
         allAltitudes = allAltitudes.concat(altitudes.filter(a => a !== null));
@@ -368,7 +373,7 @@ function zoomChartToSlider() {
     let allLabels = new Set();
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
-        dataArr.forEach(d => allLabels.add(d.timestamp));
+        dataArr.forEach(d => allLabels.add(normalizeTimestamp(d.timestamp)));
     });
     const sortedLabels = Array.from(allLabels).sort();
     const zoomedLabels = sortedLabels.slice(startIdx, endIdx + 1);
@@ -378,7 +383,7 @@ function zoomChartToSlider() {
         const color = TAG_COLORS[idx % TAG_COLORS.length].color;
         const dataArr = tagData[tagId] || [];
         const tsToAlt = {};
-        dataArr.forEach(d => { tsToAlt[d.timestamp] = Number(d.altitude_ft); });
+        dataArr.forEach(d => { tsToAlt[normalizeTimestamp(d.timestamp)] = Number(d.altitude_ft); });
         const altitudes = zoomedLabels.map(ts => tsToAlt.hasOwnProperty(ts) ? tsToAlt[ts] : null);
         allAltitudes = allAltitudes.concat(altitudes.filter(a => a !== null));
         datasets.push({
