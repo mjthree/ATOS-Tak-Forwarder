@@ -692,20 +692,17 @@ def serial_reader():
         try:
             print("🚀 Attempting to connect to /dev/ttyACM0...")
             ser = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1)
-            # Note: setDTR, setRTS, flushInput, flushOutput are deprecated but still work
-            # They're used for compatibility with older serial libraries
+            # Use correct pyserial methods for buffer reset
             try:
                 ser.setDTR(True)
                 ser.setRTS(True)
-                ser.flushInput()
-                ser.flushOutput()
+                ser.reset_input_buffer()
+                ser.reset_output_buffer()
             except AttributeError:
-                # These methods might not be available in all pyserial versions
                 pass
             stats['connected'] = True
             stats['error'] = None
             print("✅ Connected to /dev/ttyACM0")
-            
             buffer = b''
             last_stats_time = time.time()
             packets_this_second = 0
@@ -996,7 +993,7 @@ def api_db_tag_data():
         params = [tag_id]
         if start is not None and start != '':
             q += ' AND timestamp >= ?'
-            params.append(str(start))
+            params.append(int(start))
         q += ' ORDER BY timestamp'
         with atos_sqlite.get_db() as conn:
             rows = conn.execute(q, params).fetchall()
@@ -1017,10 +1014,10 @@ def api_db_export_csv():
     params = [tag_id]
     if start:
         q += ' AND timestamp >= ?'
-        params.append(str(start))
+        params.append(int(start))
     if end:
         q += ' AND timestamp <= ?'
-        params.append(str(end))
+        params.append(int(end))
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
@@ -1108,7 +1105,6 @@ def api_db_export_kml():
         'ffb469ff', # HotPink
         'ffffe0ff', # LightBlue
     ]
-    kml_styles = []
     kml_placemarks = []
     with atos_sqlite.get_db() as conn:
         for idx, tag_id in enumerate(tag_ids):
@@ -1117,65 +1113,48 @@ def api_db_export_kml():
             if len(tag_ids) == 1:
                 color = selected_color
             else:
-                # Ensure each tag gets a unique color, cycling through the palette if needed
                 color = colors[idx % len(colors)]
-            style_id = f"lineStyle{tag_id}"
-            kml_styles.append(f"""
-    <Style id="{style_id}">
-      <LineStyle>
-        <color>{color}</color>
-        <width>3</width>
-      </LineStyle>
-    </Style>""")
+            # Query tag data
             q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
             params = [tag_id]
             if start is not None and start != '':
                 q += ' AND timestamp >= ?'
-                params.append(str(start))
+                params.append(int(start))
             if end is not None and end != '':
                 q += ' AND timestamp <= ?'
-                params.append(str(end))
+                params.append(int(end))
             q += ' ORDER BY timestamp'
             rows = conn.execute(q, params).fetchall()
-            if dz_altitude is not None:
-                coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{max(0, row['altitude_ft'] - dz_altitude)}" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
-            else:
-                coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{row['altitude_ft']}" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
-            whens = '\n'.join(f"<when>{row['timestamp'].replace(' ','T')}Z</when>" for row in rows)
-            if dz_altitude is not None:
-                gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {max(0, row['altitude_ft'] - dz_altitude)}</gx:coord>" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
-            else:
-                gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
-            kml_placemarks.append(f"""
+            # Build <when> and <gx:coord> lists
+            whens = []
+            gx_coords = []
+            for row in rows:
+                if row['latitude'] == 9999999.0 or row['longitude'] == 9999999.0:
+                    continue
+                alt = max(0, row['altitude_ft'] - dz_altitude) if dz_altitude is not None else row['altitude_ft']
+                whens.append(f"<when>{row['timestamp'].replace(' ','T')}Z</when>")
+                gx_coords.append(f"<gx:coord>{row['longitude']} {row['latitude']} {alt}</gx:coord>")
+            # Placemark for this tag
+            kml_placemarks.append(f'''
     <Placemark>
-      <name>Tag {tag_id} Path</name>
-      <styleUrl>#{style_id}</styleUrl>
-      <LineString>
-        <altitudeMode>relativeToGround</altitudeMode>
-        <coordinates>
-{coords3d}
-        </coordinates>
-      </LineString>
+      <name>Tag {tag_id}</name>
+      <Style>
+        <IconStyle>
+          <scale>1.2</scale>
+          <Icon>
+            <href>http://maps.google.com/mapfiles/kml/shapes/track.png</href>
+          </Icon>
+          <color>{color}</color>
+        </IconStyle>
+      </Style>
+      <gx:Track>
+        <altitudeMode>absolute</altitudeMode>
+        {''.join(whens)}
+        {''.join(gx_coords)}
+      </gx:Track>
     </Placemark>
-    <Placemark>
-      <name>Tag {tag_id} Timed Track</name>
-      <styleUrl>#{style_id}</styleUrl>
-      <gx:MultiTrack>
-        <gx:interpolate>1</gx:interpolate>
-        <gx:Track>
-          <gx:altitudeMode>absolute</gx:altitudeMode>
-          {whens}
-          {gx_coords}
-        </gx:Track>
-      </gx:MultiTrack>
-    </Placemark>""")
-    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
-  <Document>
-    {''.join(kml_styles)}
-    {''.join(kml_placemarks)}
-  </Document>
-</kml>'''
+''')
+    kml = f'''<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n  <Document>\n    {''.join(kml_placemarks)}\n  </Document>\n</kml>'''
     filename = f"tags_{'_'.join(map(str, tag_ids))}_{start or 'all'}_{end or 'all'}.kml"
     response = make_response(kml)
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
@@ -1452,8 +1431,8 @@ def view_kml():
 
 @app.route('/api/config/dz_altitude', methods=['GET'])
 def get_dz_altitude():
-    settings = load_settings()
-    dz = settings.get('dz_altitude', 1893)
+    cfg = load_tak_config()
+    dz = cfg.get('dz_altitude', 1893)
     return {'dz_altitude': dz}
 
 @app.route('/api/config/dz_altitude', methods=['POST'])
@@ -1462,9 +1441,9 @@ def set_dz_altitude():
     dz = data.get('dz_altitude')
     if dz is None:
         return {'error': 'Missing dz_altitude'}, 400
-    settings = load_settings()
-    settings['dz_altitude'] = dz
-    save_settings(settings)
+    cfg = load_tak_config()
+    cfg['dz_altitude'] = dz
+    save_tak_config(cfg)
     return {'dz_altitude': dz}
 
 # Protect all admin API endpoints
