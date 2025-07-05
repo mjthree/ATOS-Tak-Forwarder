@@ -1057,8 +1057,7 @@ def api_db_export_kml():
     selected_color = request.args.get('color', 'ff0000ff')  # Default to red if no color specified
     print(f"[DEBUG] KML Export - Selected color: {selected_color}, Tag IDs: {tag_ids}")
     
-    # Expanded color palette (Google Earth KML format: aabbggrr)
-    # Each color is designed to be visually distinct from others
+    # Color palette matching the dropdown (Google Earth KML format: aabbggrr)
     colors = [
         'ff0000ff', # Red
         'ff00ff00', # Green
@@ -1066,51 +1065,50 @@ def api_db_export_kml():
         'ff00ffff', # Yellow
         'ffff00ff', # Magenta
         'ffffff00', # Cyan
-        'ff964b00', # Brown
+        'ff008cff', # Orange
         'ff800080', # Purple
-        'ff008080', # Teal
-        'ff808000', # Olive
-        'ff00aaff', # Orange
-        'ff00ffaa', # Spring Green
-        'ffaa00ff', # Pink
-        'ff4b0082', # Indigo
-        'ff8b4513', # Saddle Brown
-        'ff32cd32', # Lime Green
-        'ffda70d6', # Orchid
-        'ff4169e1', # Royal Blue
-        'ffdc143c', # Crimson
-        'ffff6347', # Tomato
-        'ff20b2aa', # Light Sea Green
-        'ffff69b4', # Hot Pink
-        'ffdda0dd', # Plum
-        'ff90ee90', # Light Green
-        'ff87ceeb', # Sky Blue
-        'ffd2691e', # Chocolate
-        'ffba55d3', # Medium Orchid
-        'ff228b22', # Forest Green
-        'ffb8860b', # Dark Goldenrod
-        'ffcd853f', # Peru
-        'ff9932cc', # Dark Orchid
-        'ff8fbc8f', # Dark Sea Green
-        'ffb03060', # Maroon
-        'ff2e8b57', # Sea Green
-        'ffdaa520', # Goldenrod
-        'ffcd5c5c', # Indian Red
-        'ff4b0082', # Indigo
-        'ff556b2f', # Dark Olive Green
-        'ff8b008b', # Dark Magenta
-        'ff2f4f4f', # Dark Slate Gray
-        'ffb22222', # Fire Brick
-        'ff006400', # Dark Green
-        'ff8b0000', # Dark Red
-        'ff000080', # Navy
-        'ff808000', # Olive
-        'ff800000', # Maroon
-        'ff008000', # Green
-        'ff000080', # Navy
-        'ff800080', # Purple
-        'ff008080', # Teal
+        'ffcc99ff', # Pink
+        'ff336699', # Brown
+        'ff888888', # Gray
         'ff000000', # Black
+        'ffffffff', # White
+        'ff00ff80', # Lime
+        'ff808000', # Teal
+        'ff008080', # Olive
+        'ff800000', # Navy
+        'ff000080', # Maroon
+        'ffc0c0c0', # Silver
+        'ff00d7ff', # Gold
+        'ffdcdcdc', # Beige
+        'ff507fff', # Coral
+        'ff8234b0', # Indigo
+        'ffb4a020', # Khaki
+        'ffe6e6fa', # Lavender
+        'ffbdfcc9', # Mint
+        'ffaaddee', # Peach
+        'ff7280fa', # Salmon
+        'ffd0e040', # Turquoise
+        'ffee82ee', # Violet
+        'ff3c14dc', # Crimson
+        'ffd4ff7f', # Aquamarine
+        'ffdda0dd', # Plum
+        'ffdb70db', # Orchid
+        'ff1e69d2', # Chocolate
+        'fffff0ff', # Azure
+        'fff0ffff', # Ivory
+        'fffafaff', # Snow
+        'ff4763ff', # Tomato
+        'ffb3def5', # Wheat
+        'ff908070', # SlateGray
+        'ff578b2e', # SeaGreen
+        'ffffd700', # SkyBlue
+        'ff7fff00', # SpringGreen
+        'ff8cb4d2', # Tan
+        'ffd8bfd8', # Thistle
+        'ff8f8fbc', # RosyBrown
+        'ff2d52a0', # Sienna
+        'ffb469ff', # HotPink
+        'ffffe0ff', # LightBlue
     ]
     kml_styles = []
     kml_placemarks = []
