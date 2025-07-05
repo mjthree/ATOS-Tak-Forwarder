@@ -274,4 +274,6 @@ echo "   📈 Advanced Logging: SQLite database with comprehensive tracking"
 echo "   🎛️  Multicast Control: Enable/disable multicast with dropdown"
 echo "   📋 Template System: Save and load configurations"
 echo ""
-echo "📖 See README.md for detailed documentation and troubleshooting" 
+echo "📖 See README.md for detailed documentation and troubleshooting"
+
+git pull 

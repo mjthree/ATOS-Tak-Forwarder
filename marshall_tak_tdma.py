@@ -1188,6 +1188,201 @@ def api_admin_db_info():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/admin/download_db')
+@admin_required
+def api_admin_download_db():
+    try:
+        db_path = atos_sqlite.get_db_path()
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database file not found'}), 404
+        
+        print(f"[ADMIN] Database download requested")
+        return send_file(db_path, as_attachment=True, download_name=f'atos_tak_db_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db')
+    except Exception as e:
+        print(f"[ADMIN] Error downloading database: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/archive_db', methods=['POST'])
+@admin_required
+def api_admin_archive_db():
+    try:
+        db_path = atos_sqlite.get_db_path()
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database file not found'}), 404
+        
+        # Create archive directory
+        archive_dir = Path('database_archives')
+        archive_dir.mkdir(exist_ok=True)
+        
+        # Create archive filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        archive_filename = f'atos_tak_db_archive_{timestamp}.db'
+        archive_path = archive_dir / archive_filename
+        
+        # Copy database to archive
+        import shutil
+        shutil.copy2(db_path, archive_path)
+        
+        print(f"[ADMIN] Database archived to {archive_filename}")
+        return jsonify({'message': f'Database archived successfully as {archive_filename}'})
+    except Exception as e:
+        print(f"[ADMIN] Error archiving database: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/clear_db')
+@admin_required
+def api_admin_clear_db():
+    try:
+        with atos_sqlite.get_db() as conn:
+            conn.execute('DELETE FROM tag_events')
+            conn.commit()
+        
+        print(f"[ADMIN] Database cleared")
+        return jsonify({'message': 'Database cleared successfully'})
+    except Exception as e:
+        print(f"[ADMIN] Error clearing database: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/clear_old_data', methods=['POST'])
+@admin_required
+def api_admin_clear_old_data():
+    try:
+        data = request.get_json()
+        days = data.get('days', 30)
+        
+        if not isinstance(days, int) or days < 1:
+            return jsonify({'error': 'Invalid number of days'}), 400
+        
+        cutoff_date = datetime.now() - timedelta(days=days)
+        cutoff_str = cutoff_date.strftime('%Y-%m-%d %H:%M:%S')
+        
+        with atos_sqlite.get_db() as conn:
+            result = conn.execute('DELETE FROM tag_events WHERE timestamp < ?', (cutoff_str,))
+            deleted_count = result.rowcount
+            conn.commit()
+        
+        print(f"[ADMIN] Cleared {deleted_count} records older than {days} days")
+        return jsonify({'message': f'Cleared {deleted_count} records older than {days} days'})
+    except Exception as e:
+        print(f"[ADMIN] Error clearing old data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/cleanup_invalid_tags')
+@admin_required
+def api_admin_cleanup_invalid_tags():
+    try:
+        with atos_sqlite.get_db() as conn:
+            # Delete records with tag_id not in range 1-100
+            result = conn.execute('DELETE FROM tag_events WHERE tag_id < 1 OR tag_id > 100')
+            deleted_count = result.rowcount
+            conn.commit()
+        
+        print(f"[ADMIN] Cleaned up {deleted_count} invalid tag records")
+        return jsonify({'message': f'Cleaned up {deleted_count} invalid tag records'})
+    except Exception as e:
+        print(f"[ADMIN] Error cleaning up invalid tags: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/download_archive/<filename>')
+@admin_required
+def api_admin_download_archive(filename):
+    try:
+        archive_dir = Path('database_archives')
+        archive_path = archive_dir / filename
+        
+        if not archive_path.exists():
+            return jsonify({'error': 'Archive file not found'}), 404
+        
+        print(f"[ADMIN] Archive download requested: {filename}")
+        return send_file(archive_path, as_attachment=True, download_name=filename)
+    except Exception as e:
+        print(f"[ADMIN] Error downloading archive: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/load_archive', methods=['POST'])
+@admin_required
+def api_admin_load_archive():
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        action = data.get('action', 'merge')  # merge, overwrite
+        
+        if not filename:
+            return jsonify({'error': 'Filename is required'}), 400
+        
+        archive_dir = Path('database_archives')
+        archive_path = archive_dir / filename
+        db_path = atos_sqlite.get_db_path()
+        
+        if not archive_path.exists():
+            return jsonify({'error': 'Archive file not found'}), 404
+        
+        if action == 'overwrite':
+            # Backup current database first
+            backup_filename = f'atos_tak_db_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
+            backup_path = archive_dir / backup_filename
+            import shutil
+            shutil.copy2(db_path, backup_path)
+            
+            # Overwrite current database
+            shutil.copy2(archive_path, db_path)
+            print(f"[ADMIN] Database overwritten with {filename}, backup saved as {backup_filename}")
+            return jsonify({'message': f'Database overwritten with {filename}. Backup saved as {backup_filename}'})
+        
+        elif action == 'merge':
+            # Merge archive into current database
+            import sqlite3
+            with sqlite3.connect(archive_path) as archive_conn:
+                archive_conn.row_factory = sqlite3.Row
+                with atos_sqlite.get_db() as current_conn:
+                    # Get all records from archive
+                    archive_records = archive_conn.execute('SELECT * FROM tag_events').fetchall()
+                    
+                    # Insert records that don't already exist (based on timestamp and tag_id)
+                    merged_count = 0
+                    for record in archive_records:
+                        # Check if record already exists
+                        existing = current_conn.execute(
+                            'SELECT 1 FROM tag_events WHERE tag_id = ? AND timestamp = ?',
+                            (record['tag_id'], record['timestamp'])
+                        ).fetchone()
+                        
+                        if not existing:
+                            current_conn.execute(
+                                'INSERT INTO tag_events (tag_id, latitude, longitude, altitude_ft, timestamp, voltage, is_fresh) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                                (record['tag_id'], record['latitude'], record['longitude'], record['altitude_ft'], record['timestamp'], record['voltage'], record['is_fresh'])
+                            )
+                            merged_count += 1
+                    
+                    current_conn.commit()
+            
+            print(f"[ADMIN] Merged {merged_count} records from {filename}")
+            return jsonify({'message': f'Merged {merged_count} records from {filename}'})
+        
+        else:
+            return jsonify({'error': 'Invalid action. Use "merge" or "overwrite"'}), 400
+            
+    except Exception as e:
+        print(f"[ADMIN] Error loading archive: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/delete_archive/<filename>', methods=['DELETE'])
+@admin_required
+def api_admin_delete_archive(filename):
+    try:
+        archive_dir = Path('database_archives')
+        archive_path = archive_dir / filename
+        
+        if not archive_path.exists():
+            return jsonify({'error': 'Archive file not found'}), 404
+        
+        archive_path.unlink()
+        print(f"[ADMIN] Archive deleted: {filename}")
+        return jsonify({'message': f'Archive {filename} deleted successfully'})
+    except Exception as e:
+        print(f"[ADMIN] Error deleting archive: {e}")
+        return jsonify({'error': str(e)}), 500
+
 # Protect all admin API endpoints
 def protect_admin_api():
     from flask import request
