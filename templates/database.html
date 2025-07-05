@@ -58,6 +58,7 @@
         <input type="number" id="dz-altitude" value="1893" min="0" style="width:80px;">
         <button class="export-btn" id="export-csv">Export CSV</button>
         <button class="export-btn" id="export-kml">Export KML</button>
+        <button class="export-btn" id="open-in-map">Open in Map</button>
     </div>
 </div>
 <script>
@@ -280,6 +281,23 @@ document.getElementById('export-kml').onclick = function() {
     let url = `/api/db/export_kml?tag_id=${tagId}&color=${color}`;
     url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&dz_altitude=${dzAltitude}`;
     console.log('Export KML URL:', url);
+    window.open(url, '_blank');
+};
+
+document.getElementById('open-in-map').onclick = function() {
+    const tagId = document.getElementById('tag-select').value;
+    if (!slider || tagData.length < 2) {
+        alert('Slider not ready or not enough data to export.');
+        return;
+    }
+    const [start, end] = getSliderTimeRange();
+    if (!start || !end) {
+        alert('Unable to determine slider range for export.');
+        return;
+    }
+    const dzAltitude = parseFloat(document.getElementById('dz-altitude').value) || 0;
+    let url = `/view_kml?tag_id=${tagId}`;
+    url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&dz_altitude=${dzAltitude}`;
     window.open(url, '_blank');
 };
 

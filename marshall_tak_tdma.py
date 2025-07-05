@@ -1383,6 +1383,11 @@ def api_admin_delete_archive(filename):
         print(f"[ADMIN] Error deleting archive: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/view_kml')
+def view_kml():
+    # Just render the template; JS will read query params from the URL
+    return render_template('view_kml.html')
+
 # Protect all admin API endpoints
 def protect_admin_api():
     from flask import request
