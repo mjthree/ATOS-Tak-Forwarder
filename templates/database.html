@@ -265,11 +265,6 @@ document.getElementById('minutes-submit').onclick = function() {
     fetchTagData(selected, minutesBack);
 };
 
-function cleanTimestamp(ts) {
-    // Remove microseconds if present (keep only 3 digits after decimal)
-    return ts ? ts.replace(/\.(\d{3})\d+/, '.$1') : ts;
-}
-
 function drawChart() {
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
@@ -324,22 +319,20 @@ function drawChart() {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            const d = new Date(cleanTimestamp(context[0].label));
-                            return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
+                            return context[0].label;
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    type: 'time',
-                    time: { unit: 'second' },
-                    adapters: { date: { zone: TIME_ZONE } },
-                    title: { display: true, text: 'Time' },
+                    type: 'category',
+                    title: { display: true, text: 'Time (MST)' },
                     ticks: {
                         callback: function(value, index, ticks) {
-                            const d = new Date(cleanTimestamp(this.getLabelForValue(value)));
-                            return d.toLocaleTimeString('en-US', { timeZone: TIME_ZONE });
+                            const ts = this.getLabelForValue(value);
+                            const match = ts.match(/T(\d{2}:\d{2}:\d{2})/);
+                            return match ? match[1] : ts;
                         }
                     }
                 },
@@ -411,7 +404,7 @@ function setupSlider() {
     let allTimestamps = [];
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
-        allTimestamps = allTimestamps.concat(dataArr.map(d => new Date(cleanTimestamp(d.timestamp)).getTime()));
+        allTimestamps = allTimestamps.concat(dataArr.map(d => new Date(d.timestamp).getTime()));
     });
     if (allTimestamps.length < 2) return;
     allTimestamps.sort((a, b) => a - b);
@@ -425,14 +418,8 @@ function setupSlider() {
         range: { min: minTs, max: maxTs },
         step: 1000, // 1 second
         tooltips: [
-            { to: v => {
-                const d = new Date(Number(v));
-                return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
-            }, from: Number },
-            { to: v => {
-                const d = new Date(Number(v));
-                return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
-            }, from: Number }
+            { to: v => v, from: Number },
+            { to: v => v, from: Number }
         ],
         format: {
             to: v => Math.round(v),
@@ -456,7 +443,7 @@ function zoomChartToSlider() {
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
         dataArr.forEach(d => {
-            const t = new Date(cleanTimestamp(d.timestamp)).getTime();
+            const t = new Date(d.timestamp).getTime();
             if (t >= startMs && t <= endMs) allLabels.add(d.timestamp);
         });
     });
@@ -502,22 +489,20 @@ function zoomChartToSlider() {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            const d = new Date(cleanTimestamp(context[0].label));
-                            return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
+                            return context[0].label;
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    type: 'time',
-                    time: { unit: 'second' },
-                    adapters: { date: { zone: TIME_ZONE } },
-                    title: { display: true, text: 'Time' },
+                    type: 'category',
+                    title: { display: true, text: 'Time (MST)' },
                     ticks: {
                         callback: function(value, index, ticks) {
-                            const d = new Date(cleanTimestamp(this.getLabelForValue(value)));
-                            return d.toLocaleTimeString('en-US', { timeZone: TIME_ZONE });
+                            const ts = this.getLabelForValue(value);
+                            const match = ts.match(/T(\d{2}:\d{2}:\d{2})/);
+                            return match ? match[1] : ts;
                         }
                     }
                 },
