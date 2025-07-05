@@ -128,6 +128,29 @@ function createTrackTypeDropdown(selectedTrackType, id) {
 }
 function startAutoRefresh(){refreshTimer=setInterval(fetchTags,2000);}
 function stopAutoRefresh(){clearInterval(refreshTimer);}
+function formatMSTTimeOnly(utcTimestamp) {
+  if (!utcTimestamp) return 'N/A';
+  // Accepts ISO8601 or space-separated
+  let date = new Date(utcTimestamp);
+  if (isNaN(date.getTime())) {
+    // Try to fix missing Z or T
+    if (!utcTimestamp.endsWith('Z')) utcTimestamp = utcTimestamp.replace(' ','T') + 'Z';
+    date = new Date(utcTimestamp);
+  }
+  if (isNaN(date.getTime())) return 'N/A';
+  // Convert to MST (America/Phoenix)
+  try {
+    // Use Intl.DateTimeFormat for time zone conversion
+    const options = { hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'America/Phoenix' };
+    const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);
+    const hour = parts.find(p => p.type === 'hour').value;
+    const minute = parts.find(p => p.type === 'minute').value;
+    return `${hour}:${minute}`;
+  } catch (e) {
+    // Fallback: just show hour:minute in local time
+    return date.getHours().toString().padStart(2,'0') + ':' + date.getMinutes().toString().padStart(2,'0');
+  }
+}
 function updateTable(tags){
   if(isEditing) return;
   const tbody=document.getElementById('tag-table-body');
@@ -138,79 +161,81 @@ function updateTable(tags){
     const lat = tag.latitude!==undefined ? tag.latitude.toFixed(6) : 'N/A';
     const lon = tag.longitude!==undefined ? tag.longitude.toFixed(6) : 'N/A';
     let latCell = lat;
-          let lonCell = lon;
-      if(lat !== 'N/A' && lon !== 'N/A') {
-        const url = `https://www.google.com/maps?q=${lat},${lon}`;
-        latCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lat}</a>`;
-        lonCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lon}</a>`;
-      }
-      tr.innerHTML = `<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.bad_gps?'Bad':'Good'}</td><td>${latCell}</td><td>${lonCell}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${tag.timestamp?tag.timestamp.slice(0,8):'N/A'}</td>`;
-      const f=document.createElement('td');
-      const chk=document.createElement('input');
-      chk.type='checkbox';chk.checked=tag.forward;
-      chk.onchange=()=>{fetch(`/api/tag/${id}/forward`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward:chk.checked})});};
-      f.appendChild(chk);
-      tr.appendChild(f);
-      const colorTd = document.createElement('td');
-      colorTd.appendChild(createColorDropdown(tag.color||'white', id));
-      tr.appendChild(colorTd);
-      const trackTypeTd = document.createElement('td');
-              trackTypeTd.appendChild(createTrackTypeDropdown(tag.track_type||'PAX', id));
-      tr.appendChild(trackTypeTd);
-      const c=document.createElement('td');
-      const inp=document.createElement('input');
-      inp.value=tag.callsign||`Tag${id}`;
-      inp.readOnly=true;
-      const editBtn=document.createElement('button');
-      editBtn.textContent='Edit';
-      const saveBtn=document.createElement('button');
-      saveBtn.textContent='Save';
-      saveBtn.style.display='none';
-      editBtn.onclick=()=>{isEditing=true;stopAutoRefresh();inp.readOnly=false;editBtn.style.display='none';saveBtn.style.display='inline';};
-      saveBtn.onclick=()=>{fetch(`/api/tag/${id}/callsign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callsign:inp.value})}).then(()=>{inp.readOnly=true;editBtn.style.display='inline';saveBtn.style.display='none';isEditing=false;startAutoRefresh();});};
-      c.appendChild(inp);c.appendChild(editBtn);c.appendChild(saveBtn);tr.appendChild(c);
-      tbody.appendChild(tr);
+    let lonCell = lon;
+    if(lat !== 'N/A' && lon !== 'N/A') {
+      const url = `https://www.google.com/maps?q=${lat},${lon}`;
+      latCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lat}</a>`;
+      lonCell = `<a href="${url}" target="_blank" rel="noopener noreferrer">${lon}</a>`;
     }
+    // Use MST time conversion for Last Update
+    const lastUpdate = tag.timestamp ? formatMSTTimeOnly(tag.timestamp) : 'N/A';
+    tr.innerHTML = `<td><strong>${id}</strong></td><td class="${tag.stale?'status-stale':'status-active'}">${tag.stale?'Stale':'Active'}</td><td>${tag.bad_gps?'Bad':'Good'}</td><td>${latCell}</td><td>${lonCell}</td><td>${tag.altitude_ft!==undefined?tag.altitude_ft.toFixed(1):'N/A'}</td><td>${tag.battery_voltage!==undefined?tag.battery_voltage.toFixed(2)+'V':'N/A'}</td><td>${lastUpdate}</td>`;
+    const f=document.createElement('td');
+    const chk=document.createElement('input');
+    chk.type='checkbox';chk.checked=tag.forward;
+    chk.onchange=()=>{fetch(`/api/tag/${id}/forward`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward:chk.checked})});};
+    f.appendChild(chk);
+    tr.appendChild(f);
+    const colorTd = document.createElement('td');
+    colorTd.appendChild(createColorDropdown(tag.color||'white', id));
+    tr.appendChild(colorTd);
+    const trackTypeTd = document.createElement('td');
+    trackTypeTd.appendChild(createTrackTypeDropdown(tag.track_type||'PAX', id));
+    tr.appendChild(trackTypeTd);
+    const c=document.createElement('td');
+    const inp=document.createElement('input');
+    inp.value=tag.callsign||`Tag${id}`;
+    inp.readOnly=true;
+    const editBtn=document.createElement('button');
+    editBtn.textContent='Edit';
+    const saveBtn=document.createElement('button');
+    saveBtn.textContent='Save';
+    saveBtn.style.display='none';
+    editBtn.onclick=()=>{isEditing=true;stopAutoRefresh();inp.readOnly=false;editBtn.style.display='none';saveBtn.style.display='inline';};
+    saveBtn.onclick=()=>{fetch(`/api/tag/${id}/callsign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callsign:inp.value})}).then(()=>{inp.readOnly=true;editBtn.style.display='inline';saveBtn.style.display='none';isEditing=false;startAutoRefresh();});};
+    c.appendChild(inp);c.appendChild(editBtn);c.appendChild(saveBtn);tr.appendChild(c);
+    tbody.appendChild(tr);
   }
-  function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);}
-  function fetchConfigs(){
-    fetch('/api/tak_server').then(r=>r.json()).then(d=>{
-      document.getElementById('tak-ip').value=d.ip;
-      document.getElementById('tak-port').value=d.port;
-      document.getElementById('multicast-port').value=d.multicast_port||6969;
-      document.getElementById('tdma-interval').value=d.send_interval||10;
-      document.getElementById('multicast-interval').value=d.multicast_interval||2;
-      document.getElementById('multicast-status').value = d.disable_multicast ? 'true' : 'false';
-    });
-    fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
-    fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
+}
+function fetchTags(){fetch('/api/tags').then(r=>r.json()).then(updateTable);}
+function fetchConfigs(){
+  fetch('/api/tak_server').then(r=>r.json()).then(d=>{
+    document.getElementById('tak-ip').value=d.ip;
+    document.getElementById('tak-port').value=d.port;
+    document.getElementById('multicast-port').value=d.multicast_port||6969;
+    document.getElementById('tdma-interval').value=d.send_interval||10;
+    document.getElementById('multicast-interval').value=d.multicast_interval||2;
+    document.getElementById('multicast-status').value = d.disable_multicast ? 'true' : 'false';
+  });
+  fetch('/api/forward_all').then(r=>r.json()).then(d=>{document.getElementById('forward-all').textContent=d.forward_all?'Unforward All':'Forward All';});
+  fetch('/api/templates').then(r=>r.json()).then(list=>{const sel=document.getElementById('templates');sel.innerHTML='';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.text=n;sel.appendChild(o);});});
+}
+function updateTak(){
+  const ip=document.getElementById('tak-ip').value;
+  const port=document.getElementById('tak-port').value;
+  const multicast_port=document.getElementById('multicast-port').value;
+  const send_interval=document.getElementById('tdma-interval').value;
+  const multicast_interval=document.getElementById('multicast-interval').value;
+  const disable_multicast=document.getElementById('multicast-status').value === 'true';
+  fetch('/api/tak_server',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ip,port,multicast_port,send_interval,multicast_interval,disable_multicast})
+  });
+}
+document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
+function saveTemplate(){const name=document.getElementById('template-name').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',name})}).then(fetchConfigs);}
+function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
+function deleteTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})}).then(fetchConfigs);}
+function renameTemplate(){const name=document.getElementById('templates').value;const newName=document.getElementById('template-name').value;if(!name||!newName)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rename',name,new_name:newName})}).then(fetchConfigs);}
+document.getElementById('reset-tags-btn').onclick = function() {
+  if(confirm('WARNING: This will reset ALL tags to white and callsigns to their tag number. This cannot be undone. Are you sure?')) {
+    fetch('/api/reset_tags', {method:'POST'})
+      .then(r=>r.json())
+      .then(()=>{fetchTags();});
   }
-  function updateTak(){
-    const ip=document.getElementById('tak-ip').value;
-    const port=document.getElementById('tak-port').value;
-    const multicast_port=document.getElementById('multicast-port').value;
-    const send_interval=document.getElementById('tdma-interval').value;
-    const multicast_interval=document.getElementById('multicast-interval').value;
-    const disable_multicast=document.getElementById('multicast-status').value === 'true';
-    fetch('/api/tak_server',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ip,port,multicast_port,send_interval,multicast_interval,disable_multicast})
-    });
-  }
-   document.getElementById('forward-all').onclick=()=>{const state=document.getElementById('forward-all').textContent==='Forward All';fetch('/api/forward_all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({forward_all:state})}).then(fetchConfigs);};
-  function saveTemplate(){const name=document.getElementById('template-name').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',name})}).then(fetchConfigs);}
-  function loadTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'load',name})}).then(()=>{fetchConfigs();fetchTags();});}
-  function deleteTemplate(){const name=document.getElementById('templates').value;if(!name)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',name})}).then(fetchConfigs);}
-  function renameTemplate(){const name=document.getElementById('templates').value;const newName=document.getElementById('template-name').value;if(!name||!newName)return;fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'rename',name,new_name:newName})}).then(fetchConfigs);}
-  document.getElementById('reset-tags-btn').onclick = function() {
-    if(confirm('WARNING: This will reset ALL tags to white and callsigns to their tag number. This cannot be undone. Are you sure?')) {
-      fetch('/api/reset_tags', {method:'POST'})
-        .then(r=>r.json())
-        .then(()=>{fetchTags();});
-    }
-  };
-  fetchConfigs();fetchTags();startAutoRefresh();
-  </script>
-  </body>
-  </html>
+};
+fetchConfigs();fetchTags();startAutoRefresh();
+</script>
+</body>
+</html>

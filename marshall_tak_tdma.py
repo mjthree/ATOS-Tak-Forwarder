@@ -110,7 +110,8 @@ class PerformanceMonitor:
             'network_latency_ms': 0,
             'serial_connection_status': 'disconnected',
             'tak_server_status': 'disconnected',
-            'multicast_status': 'inactive'
+            'multicast_status': 'inactive',
+            'system_cpu_percent': 0,
         }
         self.history = deque(maxlen=1000)  # Store last 1000 measurements
         self.last_update = 0
@@ -131,6 +132,7 @@ class PerformanceMonitor:
             process = psutil.Process()
             self.metrics['memory_usage_mb'] = round(process.memory_info().rss / 1024 / 1024, 2)
             self.metrics['cpu_usage_percent'] = round(process.cpu_percent(), 2)
+            self.metrics['system_cpu_percent'] = psutil.cpu_percent(interval=0.1)
         except ImportError:
             # Fallback if psutil not available
             self.metrics['memory_usage_mb'] = 0
@@ -157,8 +159,9 @@ class PerformanceMonitor:
         
         # Database size
         try:
-            if os.path.exists('atos_events.db'):
-                db_size = os.path.getsize('atos_events.db')
+            db_file = 'atos_data.db'
+            if os.path.exists(db_file):
+                db_size = os.path.getsize(db_file)
                 self.metrics['database_size_mb'] = round(db_size / 1024 / 1024, 2)
         except:
             self.metrics['database_size_mb'] = 0
@@ -297,7 +300,8 @@ stats = {
     'udp_sends': 0,
     'batch_sends': 0,
     'rate_limited_packets': 0,  # Track how many packets are rate limited
-    'active_tags': 0  # Track how many tags are currently active
+    'active_tags': 0,  # Track how many tags are currently active
+    'udp_send_failures': 0,  # Track UDP send failures
 }
 
 # High-volume queues
@@ -1082,11 +1086,16 @@ def api_performance():
     """Get detailed performance metrics"""
     metrics = performance_monitor.get_metrics()
     health_score = performance_monitor.get_health_score()
-    
+    error_breakdown = {
+        'total_packets': stats.get('total_packets', 0),
+        'rate_limited_packets': stats.get('rate_limited_packets', 0),
+        'udp_send_failures': stats.get('udp_send_failures', 0),
+    }
     return jsonify({
         'metrics': metrics,
         'health_score': health_score,
-        'status': 'healthy' if health_score >= 80 else 'warning' if health_score >= 50 else 'critical'
+        'status': 'healthy' if health_score >= 80 else 'warning' if health_score >= 50 else 'critical',
+        'error_breakdown': error_breakdown
     })
 
 @app.route('/api/performance/history')

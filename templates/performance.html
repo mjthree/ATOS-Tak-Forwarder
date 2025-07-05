@@ -167,7 +167,7 @@
 
         <!-- Connection Status -->
         <div class="row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0">
@@ -191,7 +191,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0">
@@ -215,7 +215,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0">
@@ -227,6 +227,36 @@
                     <div class="card-body">
                         <div id="alertsList">
                             <p class="text-muted">No active alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bug"></i>
+                            Error Breakdown
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="errorBreakdown">
+                            <div class="mb-2">
+                                <strong>Total Packets:</strong>
+                                <span id="totalPackets">--</span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Rate-Limited:</strong>
+                                <span id="rateLimited">--</span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>UDP Failures:</strong>
+                                <span id="udpFailures">--</span>
+                            </div>
+                            <div class="mb-2" id="otherErrorsRow" style="display: none;">
+                                <strong>Other Errors:</strong>
+                                <span id="otherErrors">--</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -418,6 +448,20 @@
             document.getElementById('packetRate').textContent = metrics.packet_processing_rate;
             document.getElementById('udpRate').textContent = metrics.udp_send_rate;
             document.getElementById('errorRate').textContent = metrics.error_rate;
+            
+            // Update error breakdown
+            document.getElementById('totalPackets').textContent = metrics.total_packets || 0;
+            document.getElementById('rateLimited').textContent = metrics.rate_limited_packets || 0;
+            document.getElementById('udpFailures').textContent = metrics.udp_send_failures || 0;
+            
+            // Show/hide other errors row
+            const otherErrorsRow = document.getElementById('otherErrorsRow');
+            if (metrics.other_errors !== undefined && metrics.other_errors > 0) {
+                document.getElementById('otherErrors').textContent = metrics.other_errors;
+                otherErrorsRow.style.display = 'block';
+            } else {
+                otherErrorsRow.style.display = 'none';
+            }
         }
 
         // Update connection status
