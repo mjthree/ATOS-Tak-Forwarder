@@ -1054,6 +1054,8 @@ def api_db_export_kml():
     start = request.args.get('start')
     end = request.args.get('end')
     dz_altitude = request.args.get('dz_altitude', type=float)
+    selected_color = request.args.get('color', 'ff0000ff')  # Default to red if no color specified
+    
     # Predefined color palette (Google Earth KML format: aabbggrr)
     colors = [
         'ff0000ff', # Red
@@ -1076,7 +1078,11 @@ def api_db_export_kml():
     kml_placemarks = []
     with atos_sqlite.get_db() as conn:
         for idx, tag_id in enumerate(tag_ids):
-            color = colors[idx % len(colors)]
+            # Use selected color for single tag, or cycle through colors for multiple tags
+            if len(tag_ids) == 1:
+                color = selected_color
+            else:
+                color = colors[idx % len(colors)]
             style_id = f"lineStyle{tag_id}"
             kml_styles.append(f"""
     <Style id="{style_id}">
