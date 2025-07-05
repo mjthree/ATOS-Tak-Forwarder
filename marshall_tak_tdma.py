@@ -33,6 +33,36 @@ import logging
 from logging.handlers import RotatingFileHandler
 import shutil
 import psutil
+import pytz
+
+# Timezone conversion utility
+def convert_utc_to_mst(utc_timestamp_str):
+    """
+    Convert UTC timestamp string to MST (America/Phoenix) timestamp string.
+    
+    Args:
+        utc_timestamp_str (str): UTC timestamp in ISO format (e.g., '2024-01-01T12:00:00Z')
+        
+    Returns:
+        str: MST timestamp in ISO format (e.g., '2024-01-01T05:00:00-07:00')
+    """
+    try:
+        # Parse the UTC timestamp
+        if utc_timestamp_str.endswith('Z'):
+            utc_timestamp_str = utc_timestamp_str[:-1] + '+00:00'
+        
+        utc_dt = datetime.fromisoformat(utc_timestamp_str)
+        
+        # Convert to MST (America/Phoenix)
+        mst_tz = pytz.timezone('America/Phoenix')
+        mst_dt = utc_dt.astimezone(mst_tz)
+        
+        # Return in ISO format with timezone offset
+        return mst_dt.isoformat()
+    except Exception as e:
+        logger.error(f"Error converting UTC to MST: {e}")
+        # Return original timestamp if conversion fails
+        return utc_timestamp_str
 
 app = Flask(__name__)
 app.secret_key = 'apexshield-atos-tak-forwarder-2024'
@@ -1311,15 +1341,19 @@ def api_db_tag_data():
                     if alt_ft is not None:
                         alt_ft = round(alt_ft, 1)
                     ts = row['timestamp']
-                    # Ensure millisecond UTC ISO format
+                    # Ensure millisecond UTC ISO format and convert to MST
                     if ts:
                         try:
                             dt = datetime.fromisoformat(ts.replace('Z','').replace(' ','T'))
                             dt = dt.replace(tzinfo=timezone.utc)
-                            ts = dt.isoformat(timespec='milliseconds').replace('+00:00','Z')
+                            utc_ts = dt.isoformat(timespec='milliseconds').replace('+00:00','Z')
+                            # Convert UTC to MST
+                            ts = convert_utc_to_mst(utc_ts)
                         except Exception:
                             if not ts.endswith('Z'):
                                 ts = ts.replace(' ', 'T') + 'Z'
+                            # Still try to convert to MST
+                            ts = convert_utc_to_mst(ts)
                     data.append({'timestamp': ts, 'altitude_ft': alt_ft})
                 result[tag_id] = data
         return jsonify(result)
@@ -1367,11 +1401,17 @@ def api_db_export_csv():
         writer.writerow(['timestamp', 'altitude_ft', 'altitude_agl'])
         for row in rows:
             agl = max(0, row['altitude_ft'] - dz_altitude)
-            writer.writerow([row['timestamp'], row['altitude_ft'], agl])
+            # Convert UTC timestamp to MST for CSV
+            utc_ts = row['timestamp'].replace(' ','T') + 'Z'
+            mst_ts = convert_utc_to_mst(utc_ts)
+            writer.writerow([mst_ts, row['altitude_ft'], agl])
     else:
         writer.writerow(['timestamp', 'altitude_ft'])
         for row in rows:
-            writer.writerow([row['timestamp'], row['altitude_ft']])
+            # Convert UTC timestamp to MST for CSV
+            utc_ts = row['timestamp'].replace(' ','T') + 'Z'
+            mst_ts = convert_utc_to_mst(utc_ts)
+            writer.writerow([mst_ts, row['altitude_ft']])
     output.seek(0)
     filename = f"tag_{tag_id}_{start or 'all'}_{end or 'all'}.csv"
     response = make_response(output.read())
@@ -1481,7 +1521,10 @@ def api_db_export_kml():
                 if row['latitude'] == 9999999.0 or row['longitude'] == 9999999.0:
                     continue
                 alt = max(0, row['altitude_ft'] - dz_altitude) if dz_altitude is not None else row['altitude_ft']
-                whens.append(f"<when>{row['timestamp'].replace(' ','T')}Z</when>")
+                # Convert UTC timestamp to MST for KML
+                utc_ts = row['timestamp'].replace(' ','T') + 'Z'
+                mst_ts = convert_utc_to_mst(utc_ts)
+                whens.append(f"<when>{mst_ts}</when>")
                 gx_coords.append(f"<gx:coord>{row['longitude']} {row['latitude']} {alt}</gx:coord>")
             # Placemark for this tag
             kml_placemarks.append(f'''
