@@ -755,9 +755,6 @@ def packet_processor():
                     tag_id = result['tag_id']
                     current_time = time.time()
                     
-                    # Always update last processed time for active tag tracking
-                    timing_system.mark_tag_processed(tag_id, current_time)
-                    
                     # Use unified timing system for rate limiting
                     if not timing_system.can_process_tag(tag_id, current_time):
                         # Skip this packet - too soon since last update for this tag
