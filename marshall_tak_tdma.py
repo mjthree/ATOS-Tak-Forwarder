@@ -968,42 +968,41 @@ def api_db_tags():
 
 @app.route('/api/db/tag_data')
 def api_db_tag_data():
-    # Query: ?tag_id=1&start=...&end=...&minutes=...
+    # Query: ?tag_id=1,2,3&start=...&end=...&minutes=...
     tag_id_param = request.args.get('tag_id')
     if tag_id_param is None:
         return jsonify({'error': 'tag_id parameter is required'}), 400
-    tag_id = int(tag_id_param)
+    tag_ids = [int(tid) for tid in tag_id_param.split(',') if tid.strip().isdigit()]
+    if not tag_ids:
+        return jsonify({'error': 'No valid tag IDs provided'}), 400
     minutes = request.args.get('minutes')
-    if minutes:
-        try:
-            minutes = int(minutes)
-            # Get the latest timestamp for this tag
-            with atos_sqlite.get_db() as conn:
-                row = conn.execute('SELECT MAX(timestamp) as max_ts FROM tag_events WHERE tag_id=?', (tag_id,)).fetchone()
-                latest_ts = row['max_ts'] if row and row['max_ts'] else None
-            print(f"[DEBUG] Latest timestamp for tag {tag_id}: {latest_ts}")
-            if latest_ts:
-                # Parse latest_ts as datetime
-                latest_dt = dateparser.parse(latest_ts)
-                start_dt = latest_dt - timedelta(minutes=minutes)
-                start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
-                print(f"[DEBUG] Calculated start time for {minutes} minutes: {start}")
-            else:
+    result = {}
+    for tag_id in tag_ids:
+        start = None
+        if minutes:
+            try:
+                minutes_int = int(minutes)
+                # Get the latest timestamp for this tag
+                with atos_sqlite.get_db() as conn:
+                    row = conn.execute('SELECT MAX(timestamp) as max_ts FROM tag_events WHERE tag_id=?', (tag_id,)).fetchone()
+                    latest_ts = row['max_ts'] if row and row['max_ts'] else None
+                if latest_ts:
+                    latest_dt = dateparser.parse(latest_ts)
+                    start_dt = latest_dt - timedelta(minutes=minutes_int)
+                    start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
+            except Exception as e:
                 start = None
-        except Exception as e:
-            print(f"[ERROR] Invalid minutes param or timestamp parse: {e}")
-            start = None
-    q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
-    params = [tag_id]
-    if start is not None and start != '':
-        q += ' AND timestamp >= ?'
-        params.append(str(start))
-    q += ' ORDER BY timestamp'
-    with atos_sqlite.get_db() as conn:
-        rows = conn.execute(q, params).fetchall()
-        data = [{'timestamp': row['timestamp'], 'altitude_ft': row['altitude_ft']} for row in rows]
-    print(f"[DEBUG] Query returned {len(data)} rows for tag {tag_id}")
-    return jsonify(data)
+        q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
+        params = [tag_id]
+        if start is not None and start != '':
+            q += ' AND timestamp >= ?'
+            params.append(str(start))
+        q += ' ORDER BY timestamp'
+        with atos_sqlite.get_db() as conn:
+            rows = conn.execute(q, params).fetchall()
+            data = [{'timestamp': row['timestamp'], 'altitude_ft': row['altitude_ft']} for row in rows]
+        result[tag_id] = data
+    return jsonify(result)
 
 @app.route('/api/db/export_csv')
 def api_db_export_csv():
@@ -1055,7 +1054,6 @@ def api_db_export_kml():
     end = request.args.get('end')
     dz_altitude = request.args.get('dz_altitude', type=float)
     selected_color = request.args.get('color', 'ff0000ff')  # Default to red if no color specified
-    print(f"[DEBUG] KML Export - Selected color: {selected_color}, Tag IDs: {tag_ids}")
     
     # Color palette matching the dropdown (Google Earth KML format: aabbggrr)
     colors = [
@@ -1121,7 +1119,6 @@ def api_db_export_kml():
             else:
                 # Ensure each tag gets a unique color, cycling through the palette if needed
                 color = colors[idx % len(colors)]
-            print(f"[DEBUG] Tag {tag_id} using color: {color}")
             style_id = f"lineStyle{tag_id}"
             kml_styles.append(f"""
     <Style id="{style_id}">

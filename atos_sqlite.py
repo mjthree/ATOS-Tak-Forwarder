@@ -1,5 +1,7 @@
 import sqlite3
 from pathlib import Path
+import threading
+from datetime import datetime
 
 DB_PATH = Path('atos_data.db')
 
@@ -27,6 +29,10 @@ CREATE TABLE IF NOT EXISTS tag_events (
 CREATE INDEX IF NOT EXISTS idx_tag_time ON tag_events (tag_id, timestamp);
 '''
 
+# In-memory cache for last write time per tag_id
+_last_write_times = {}
+_last_write_lock = threading.Lock()
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -41,7 +47,19 @@ def insert_tag_event(**kwargs):
     tag_id = kwargs.get('tag_id')
     if tag_id is None or tag_id < 1 or tag_id > 100:
         return  # Skip invalid tag IDs
-    
+    timestamp = kwargs.get('timestamp')
+    if not timestamp:
+        timestamp = datetime.now().isoformat()
+    # Throttle: only write if at least 1 second since last write for this tag
+    with _last_write_lock:
+        last = _last_write_times.get(tag_id)
+        try:
+            ts = datetime.fromisoformat(timestamp)
+        except Exception:
+            ts = datetime.now()
+        if last and (ts - last).total_seconds() < 1.0:
+            return  # Skip this write
+        _last_write_times[tag_id] = ts
     fields = [
         'timestamp','tag_id','latitude','longitude','altitude_ft','battery_voltage','temperature','pdop',
         'wire_status','object_status','emergency','is_fresh','bad_gps','tak_ip','tak_port','cot_xml','event_type'
