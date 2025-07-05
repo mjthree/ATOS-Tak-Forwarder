@@ -25,7 +25,8 @@
         const start = getQueryParam('start');
         const end = getQueryParam('end');
         const dzAltitude = getQueryParam('dz_altitude');
-        let kmlUrl = `/api/db/export_kml?tag_id=${tagId}`;
+        const kmlAltitudeMode = getQueryParam('kml_altitude_mode') || 'clampToGround';
+        let kmlUrl = `/api/db/export_kml?tag_id=${tagId}&kml_altitude_mode=${kmlAltitudeMode}`;
         if (start) kmlUrl += `&start=${encodeURIComponent(start)}`;
         if (end) kmlUrl += `&end=${encodeURIComponent(end)}`;
         if (dzAltitude) kmlUrl += `&dz_altitude=${dzAltitude}`;

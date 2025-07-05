@@ -169,7 +169,7 @@ EOF
         # Update the Python script with the new password
         echo "🔐 Updating admin password in application..."
         # Create a temporary Python script to update the password hash
-        cat > /tmp/update_password.py << 'PYTHON_EOF'
+                cat > /tmp/update_password.py << PYTHON_EOF
 import hashlib
 import sys
 
@@ -186,9 +186,9 @@ print(f"Password hash: {password_hash}")
 with open('marshall_tak_tdma.py', 'r') as f:
     content = f.read()
 
-# Replace the hardcoded password in the function
-old_line = "    return hashlib.sha256('apex123APEX!@#'.encode('utf-8')).hexdigest()"
-new_line = f"    return hashlib.sha256('{password}'.encode('utf-8')).hexdigest()"
+# Replace the hardcoded hash with the new password hash
+old_line = "ADMIN_PASSWORD_HASH = 'b1e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2'"
+new_line = f"ADMIN_PASSWORD_HASH = '{password_hash}'"
 
 if old_line in content:
     content = content.replace(old_line, new_line)
@@ -202,6 +202,8 @@ with open('marshall_tak_tdma.py', 'w') as f:
     f.write(content)
 PYTHON_EOF
 
+        # Generate the password hash first
+        password_hash=$(python3 -c "import hashlib; print(hashlib.sha256('$admin_password'.encode('utf-8')).hexdigest())")
         python3 /tmp/update_password.py "$admin_password"
         rm /tmp/update_password.py
         

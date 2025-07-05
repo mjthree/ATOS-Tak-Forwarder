@@ -1437,6 +1437,7 @@ def api_db_export_kml():
     dz_altitude = request.args.get('dz_altitude', type=float)
     sample_1hz = request.args.get('sample_1hz', 'false').lower() == 'true'
     selected_color = request.args.get('color', 'ff0000ff')  # Default to red if no color specified
+    kml_altitude_mode = request.args.get('kml_altitude_mode', 'clampToGround')  # Default to clampToGround
     
     # Color palette matching the dropdown (Google Earth KML format: aabbggrr)
     colors = [
@@ -1538,7 +1539,14 @@ def api_db_export_kml():
             for row in rows:
                 if row['latitude'] == 9999999.0 or row['longitude'] == 9999999.0:
                     continue
-                alt = max(0, row['altitude_ft'] - dz_altitude) if dz_altitude is not None else row['altitude_ft']
+                # Handle altitude based on mode
+                if kml_altitude_mode == 'clampToGround':
+                    # For ground track, set altitude to 0 (will be clamped to ground)
+                    alt = 0
+                else:
+                    # For 3D track, use actual altitude with DZ adjustment
+                    alt = max(0, row['altitude_ft'] - dz_altitude) if dz_altitude is not None else row['altitude_ft']
+                
                 utc_ts = row['timestamp']
                 if not utc_ts.endswith('Z'):
                     utc_ts = utc_ts.replace(' ','T') + 'Z'
@@ -1550,7 +1558,7 @@ def api_db_export_kml():
       <name>Tag {tag_id}</name>
       <styleUrl>#{style_id}</styleUrl>
       <gx:Track>
-        <altitudeMode>absolute</altitudeMode>
+        <altitudeMode>{kml_altitude_mode}</altitudeMode>
         {''.join(whens)}
         {''.join(gx_coords)}
       </gx:Track>

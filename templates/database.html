@@ -141,6 +141,11 @@
                     <button class="export-btn" id="save-dz-altitude">Save</button>
                     <span id="dz-save-status" style="margin-left:10px;color:green;display:none;">Saved!</span>
                     <button class="export-btn" id="export-csv">Export CSV</button>
+                    <label for="kml-altitude-mode" style="margin-left:20px;">KML Altitude:</label>
+                    <select id="kml-altitude-mode" style="margin-left:5px;">
+                        <option value="clampToGround">Ground Track</option>
+                        <option value="absolute">3D Track</option>
+                    </select>
                     <button class="export-btn" id="export-kml">Export KML</button>
                     <button class="export-btn" id="open-in-map">Open in Map</button>
                 </div>
@@ -588,7 +593,8 @@ document.getElementById('export-kml').onclick = function() {
     }
     const color = document.getElementById('kml-color').value;
     const dzAltitude = parseFloat(document.getElementById('dz-altitude').value) || 0;
-    let url = `/api/db/export_kml?tag_id=${selected.join(',')}&color=${color}`;
+    const kmlAltitudeMode = document.getElementById('kml-altitude-mode').value;
+    let url = `/api/db/export_kml?tag_id=${selected.join(',')}&color=${color}&kml_altitude_mode=${kmlAltitudeMode}`;
     url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&dz_altitude=${dzAltitude}`;
     console.log('Export KML URL:', url);
     window.open(url, '_blank');
@@ -606,7 +612,8 @@ document.getElementById('open-in-map').onclick = function() {
         return;
     }
     const dzAltitude = parseFloat(document.getElementById('dz-altitude').value) || 0;
-    let url = `/view_kml?tag_id=${tagId}`;
+    const kmlAltitudeMode = document.getElementById('kml-altitude-mode').value;
+    let url = `/view_kml?tag_id=${tagId}&kml_altitude_mode=${kmlAltitudeMode}`;
     url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&dz_altitude=${dzAltitude}`;
     window.open(url, '_blank');
 };
