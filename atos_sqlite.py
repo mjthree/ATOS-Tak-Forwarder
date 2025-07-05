@@ -49,7 +49,21 @@ def insert_tag_event(**kwargs):
         return  # Skip invalid tag IDs
     timestamp = kwargs.get('timestamp')
     if not timestamp:
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now().replace(microsecond=0).isoformat()
+    else:
+        # Truncate to second precision
+        try:
+            ts = datetime.fromisoformat(timestamp)
+            timestamp = ts.replace(microsecond=0).isoformat()
+        except Exception:
+            pass
+    # Round altitude_ft to one decimal place if present
+    altitude_ft = kwargs.get('altitude_ft')
+    if altitude_ft is not None:
+        try:
+            altitude_ft = round(float(altitude_ft), 1)
+        except Exception:
+            pass
     # Throttle: only write if at least 1 second since last write for this tag
     with _last_write_lock:
         last = _last_write_times.get(tag_id)
@@ -64,7 +78,11 @@ def insert_tag_event(**kwargs):
         'timestamp','tag_id','latitude','longitude','altitude_ft','battery_voltage','temperature','pdop',
         'wire_status','object_status','emergency','is_fresh','bad_gps','tak_ip','tak_port','cot_xml','event_type'
     ]
-    values = [kwargs.get(f) for f in fields]
+    values = [
+        timestamp if f == 'timestamp' else
+        altitude_ft if f == 'altitude_ft' else
+        kwargs.get(f) for f in fields
+    ]
     with get_db() as conn:
         conn.execute(f"""
             INSERT INTO tag_events ({','.join(fields)})
