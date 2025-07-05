@@ -15,7 +15,7 @@
         .nav-bar a:hover{background:#2c3e50;}
         .nav-bar a.active{background:#2c3e50;font-weight:bold;}
         .header{background:#2c3e50;color:#fff;padding:20px;margin:0 0 20px 0;}
-        .container{max-width:1200px;margin:0 auto;padding:20px;display:flex;flex-direction:row;align-items:flex-start;}
+        .container{max-width:1400px;margin:0 auto;padding:20px;display:flex;flex-direction:row;align-items:flex-start;}
         .sidebar{
             min-width:180px;
             max-width:220px;
@@ -24,17 +24,20 @@
             border-radius:8px;
             box-shadow:0 2px 8px #0001;
             padding:20px 10px 20px 20px;
-            height:420px;
+            height:600px;
             display:flex;
             flex-direction:column;
             align-items:stretch;
         }
-        #tag-select{width:100%;height:340px;min-height:340px;max-height:340px;}
-        .legend-list{margin:0 0 10px 0;padding:0;list-style:none;}
-        .legend-list li{display:flex;align-items:center;margin-bottom:6px;font-size:0.98em;}
-        .legend-color{display:inline-block;width:18px;height:18px;border-radius:3px;margin-right:8px;border:1px solid #ccc;}
-        #chart-container{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 8px #0001;flex:1;min-width:0;}
+        #tag-select{width:100%;height:540px;min-height:540px;max-height:540px;}
+        .main-content{flex:1;min-width:0;display:flex;flex-direction:column;}
+        .top-controls{display:flex;align-items:center;justify-content:flex-start;margin-bottom:10px;gap:20px;}
         #slider{margin:30px 0;}
+        #chart-legend-row{display:flex;flex-direction:row;align-items:flex-start;}
+        #chart-container{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 8px #0001;flex:1;min-width:0;}
+        .legend-list{margin:0 0 0 30px;padding:0;list-style:none;min-width:120px;}
+        .legend-list li{display:flex;align-items:center;margin-bottom:10px;font-size:1em;}
+        .legend-color{display:inline-block;width:18px;height:18px;border-radius:3px;margin-right:8px;border:1px solid #ccc;}
         .export-btn{margin-right:10px;}
         .company-brand{font-size:0.9em;opacity:0.8;margin-top:5px;}
     </style>
@@ -52,76 +55,82 @@
 <div class="container">
     <div class="sidebar">
         <label for="tag-select"><b>Select Tag(s):</b></label>
-        <select id="tag-select" multiple size="20"></select>
-        <label for="minutes-back" style="margin-top:10px;">Previous minutes:</label>
-        <input type="number" id="minutes-back" value="30" min="1" style="width:70px;">
-        <button id="minutes-submit">Submit</button>
-        <ul id="legend-list" class="legend-list"></ul>
+        <select id="tag-select" multiple size="30"></select>
     </div>
-    <div style="flex:1;min-width:0;">
-        <div id="slider"></div>
-        <div id="chart-container">
-            <canvas id="altitude-chart" height="400"></canvas>
+    <div class="main-content">
+        <div class="top-controls">
+            <label for="minutes-back">Previous minutes:</label>
+            <input type="number" id="minutes-back" value="30" min="1" style="width:70px;">
+            <button id="minutes-submit">Submit</button>
         </div>
-        <div style="margin-top:20px;">
-            <label for="kml-color">KML Line Color:</label>
-            <select id="kml-color">
-                <option value="ff0000ff">Red</option>
-                <option value="ff00ff00">Green</option>
-                <option value="ffff0000">Blue</option>
-                <option value="ff00ffff">Yellow</option>
-                <option value="ffff00ff">Magenta</option>
-                <option value="ffffff00">Cyan</option>
-                <option value="ff008cff">Orange</option>
-                <option value="ff800080">Purple</option>
-                <option value="ffcc99ff">Pink</option>
-                <option value="ff336699">Brown</option>
-                <option value="ff888888">Gray</option>
-                <option value="ff000000">Black</option>
-                <option value="ffffffff">White</option>
-                <option value="ff00ff80">Lime</option>
-                <option value="ff808000">Teal</option>
-                <option value="ff008080">Olive</option>
-                <option value="ff800000">Navy</option>
-                <option value="ff000080">Maroon</option>
-                <option value="ffc0c0c0">Silver</option>
-                <option value="ff00d7ff">Gold</option>
-                <option value="ffdcdcdc">Beige</option>
-                <option value="ff507fff">Coral</option>
-                <option value="ff8234b0">Indigo</option>
-                <option value="ffb4a020">Khaki</option>
-                <option value="ffe6e6fa">Lavender</option>
-                <option value="ffbdfcc9">Mint</option>
-                <option value="ffaaddee">Peach</option>
-                <option value="ff7280fa">Salmon</option>
-                <option value="ffd0e040">Turquoise</option>
-                <option value="ffee82ee">Violet</option>
-                <option value="ff3c14dc">Crimson</option>
-                <option value="ffd4ff7f">Aquamarine</option>
-                <option value="ffdda0dd">Plum</option>
-                <option value="ffdb70db">Orchid</option>
-                <option value="ff1e69d2">Chocolate</option>
-                <option value="fffff0ff">Azure</option>
-                <option value="fff0ffff">Ivory</option>
-                <option value="fffafaff">Snow</option>
-                <option value="ff4763ff">Tomato</option>
-                <option value="ffb3def5">Wheat</option>
-                <option value="ff908070">SlateGray</option>
-                <option value="ff578b2e">SeaGreen</option>
-                <option value="ffffd700">SkyBlue</option>
-                <option value="ff7fff00">SpringGreen</option>
-                <option value="ff8cb4d2">Tan</option>
-                <option value="ffd8bfd8">Thistle</option>
-                <option value="ff8f8fbc">RosyBrown</option>
-                <option value="ff2d52a0">Sienna</option>
-                <option value="ffb469ff">HotPink</option>
-                <option value="ffffe0ff">LightBlue</option>
-            </select>
-            <label for="dz-altitude" style="margin-left:20px;">DZ Altitude:</label>
-            <input type="number" id="dz-altitude" value="1893" min="0" style="width:80px;">
-            <button class="export-btn" id="export-csv">Export CSV</button>
-            <button class="export-btn" id="export-kml">Export KML</button>
-            <button class="export-btn" id="open-in-map">Open in Map</button>
+        <div id="chart-legend-row">
+            <div style="flex:1;min-width:0;">
+                <div id="slider"></div>
+                <div id="chart-container">
+                    <canvas id="altitude-chart" height="400"></canvas>
+                </div>
+                <div style="margin-top:20px;">
+                    <label for="kml-color">KML Line Color:</label>
+                    <select id="kml-color">
+                        <option value="ff0000ff">Red</option>
+                        <option value="ff00ff00">Green</option>
+                        <option value="ffff0000">Blue</option>
+                        <option value="ff00ffff">Yellow</option>
+                        <option value="ffff00ff">Magenta</option>
+                        <option value="ffffff00">Cyan</option>
+                        <option value="ff008cff">Orange</option>
+                        <option value="ff800080">Purple</option>
+                        <option value="ffcc99ff">Pink</option>
+                        <option value="ff336699">Brown</option>
+                        <option value="ff888888">Gray</option>
+                        <option value="ff000000">Black</option>
+                        <option value="ffffffff">White</option>
+                        <option value="ff00ff80">Lime</option>
+                        <option value="ff808000">Teal</option>
+                        <option value="ff008080">Olive</option>
+                        <option value="ff800000">Navy</option>
+                        <option value="ff000080">Maroon</option>
+                        <option value="ffc0c0c0">Silver</option>
+                        <option value="ff00d7ff">Gold</option>
+                        <option value="ffdcdcdc">Beige</option>
+                        <option value="ff507fff">Coral</option>
+                        <option value="ff8234b0">Indigo</option>
+                        <option value="ffb4a020">Khaki</option>
+                        <option value="ffe6e6fa">Lavender</option>
+                        <option value="ffbdfcc9">Mint</option>
+                        <option value="ffaaddee">Peach</option>
+                        <option value="ff7280fa">Salmon</option>
+                        <option value="ffd0e040">Turquoise</option>
+                        <option value="ffee82ee">Violet</option>
+                        <option value="ff3c14dc">Crimson</option>
+                        <option value="ffd4ff7f">Aquamarine</option>
+                        <option value="ffdda0dd">Plum</option>
+                        <option value="ffdb70db">Orchid</option>
+                        <option value="ff1e69d2">Chocolate</option>
+                        <option value="fffff0ff">Azure</option>
+                        <option value="fff0ffff">Ivory</option>
+                        <option value="fffafaff">Snow</option>
+                        <option value="ff4763ff">Tomato</option>
+                        <option value="ffb3def5">Wheat</option>
+                        <option value="ff908070">SlateGray</option>
+                        <option value="ff578b2e">SeaGreen</option>
+                        <option value="ffffd700">SkyBlue</option>
+                        <option value="ff7fff00">SpringGreen</option>
+                        <option value="ff8cb4d2">Tan</option>
+                        <option value="ffd8bfd8">Thistle</option>
+                        <option value="ff8f8fbc">RosyBrown</option>
+                        <option value="ff2d52a0">Sienna</option>
+                        <option value="ffb469ff">HotPink</option>
+                        <option value="ffffe0ff">LightBlue</option>
+                    </select>
+                    <label for="dz-altitude" style="margin-left:20px;">DZ Altitude:</label>
+                    <input type="number" id="dz-altitude" value="1893" min="0" style="width:80px;">
+                    <button class="export-btn" id="export-csv">Export CSV</button>
+                    <button class="export-btn" id="export-kml">Export KML</button>
+                    <button class="export-btn" id="open-in-map">Open in Map</button>
+                </div>
+            </div>
+            <ul id="legend-list" class="legend-list"></ul>
         </div>
     </div>
 </div>
