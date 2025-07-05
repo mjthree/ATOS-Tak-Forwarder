@@ -322,10 +322,8 @@ TEMPLATES_FILE = 'templates.json'
 
 ADMIN_PASSWORD_HASH = 'b1e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2'  # placeholder, will set real hash below
 
-# Set the real hash for 'apex123APEX!@#'
-def _get_admin_password_hash():
-    return hashlib.sha256('apex123APEX!@#'.encode('utf-8')).hexdigest()
-ADMIN_PASSWORD_HASH = _get_admin_password_hash()
+# Admin password hash (SHA256 of the actual password)
+ADMIN_PASSWORD_HASH = 'b1e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2'
 
 def check_admin_auth():
     from flask import session, request
@@ -1493,13 +1491,27 @@ def api_db_export_kml():
         'ffb469ff', # HotPink
         'ffffe0ff', # LightBlue
     ]
-    kml_placemarks = []
+    style_blocks = []
+    placemarks = []
     with atos_sqlite.get_db() as conn:
         for idx, tag_id in enumerate(tag_ids):
             if len(tag_ids) == 1:
                 color = selected_color
             else:
                 color = colors[idx % len(colors)]
+            style_id = f"tag{tag_id}Style"
+            style_blocks.append(f'''
+    <Style id="{style_id}">
+      <LineStyle><color>{color}</color><width>4</width></LineStyle>
+      <IconStyle>
+        <scale>1.2</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/shapes/track.png</href>
+        </Icon>
+        <color>{color}</color>
+      </IconStyle>
+    </Style>
+''')
             q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
             params = [int(tag_id)]
             if start is not None and start != '':
@@ -1521,33 +1533,22 @@ def api_db_export_kml():
                         filtered.append(row)
                         last_sec = sec
                 rows = filtered
-            # Build <when> and <gx:coord> lists
             whens = []
             gx_coords = []
             for row in rows:
                 if row['latitude'] == 9999999.0 or row['longitude'] == 9999999.0:
                     continue
                 alt = max(0, row['altitude_ft'] - dz_altitude) if dz_altitude is not None else row['altitude_ft']
-                # Convert UTC timestamp to MST for KML export
                 utc_ts = row['timestamp']
                 if not utc_ts.endswith('Z'):
                     utc_ts = utc_ts.replace(' ','T') + 'Z'
                 mst_ts = convert_utc_to_mst(utc_ts)
                 whens.append(f"<when>{mst_ts}</when>")
                 gx_coords.append(f"<gx:coord>{row['longitude']} {row['latitude']} {alt}</gx:coord>")
-            # Placemark for this tag
-            kml_placemarks.append(f'''
+            placemarks.append(f'''
     <Placemark>
       <name>Tag {tag_id}</name>
-      <Style>
-        <IconStyle>
-          <scale>1.2</scale>
-          <Icon>
-            <href>http://maps.google.com/mapfiles/kml/shapes/track.png</href>
-          </Icon>
-          <color>{color}</color>
-        </IconStyle>
-      </Style>
+      <styleUrl>#{style_id}</styleUrl>
       <gx:Track>
         <altitudeMode>absolute</altitudeMode>
         {''.join(whens)}
@@ -1555,7 +1556,13 @@ def api_db_export_kml():
       </gx:Track>
     </Placemark>
 ''')
-    kml = f'''<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n  <Document>\n    {''.join(kml_placemarks)}\n  </Document>\n</kml>'''
+    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    {''.join(style_blocks)}
+    {''.join(placemarks)}
+  </Document>
+</kml>'''
     filename = f"tags_{'_'.join(map(str, tag_ids))}_{start or 'all'}_{end or 'all'}.kml"
     response = make_response(kml)
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
