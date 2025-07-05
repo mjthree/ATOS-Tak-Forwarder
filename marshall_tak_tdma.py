@@ -756,11 +756,6 @@ def serial_reader():
             print(f"❌ {error_msg}")
             stats['connected'] = False
             stats['error'] = error_msg
-        except Exception as e:
-            error_msg = f"Unexpected error: {e}"
-            print(f"❌ {error_msg}")
-            stats['connected'] = False
-            stats['error'] = error_msg
         finally:
             if ser and ser.is_open:
                 try:
@@ -1053,45 +1048,66 @@ def api_db_export_kml():
     tag_id_param = request.args.get('tag_id')
     if tag_id_param is None:
         return jsonify({'error': 'tag_id parameter is required'}), 400
-    tag_id = int(tag_id_param)
+    tag_ids = [int(tid) for tid in tag_id_param.split(',') if tid.strip().isdigit()]
+    if not tag_ids:
+        return jsonify({'error': 'No valid tag IDs provided'}), 400
     start = request.args.get('start')
     end = request.args.get('end')
-    color = request.args.get('color', 'ff0000ff')
     dz_altitude = request.args.get('dz_altitude', type=float)
-    q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
-    params = [tag_id]
-    if start is not None and start != '':
-        q += ' AND timestamp >= ?'
-        params.append(str(start))
-    if end is not None and end != '':
-        q += ' AND timestamp <= ?'
-        params.append(str(end))
-    q += ' ORDER BY timestamp'
+    # Predefined color palette (Google Earth KML format: aabbggrr)
+    colors = [
+        'ff0000ff', # Red
+        'ff00ff00', # Green
+        'ffff0000', # Blue
+        'ff00ffff', # Yellow
+        'ffff00ff', # Magenta
+        'ffffff00', # Cyan
+        'ff000000', # Black
+        'ffffffff', # White
+        'ff964b00', # Brown
+        'ff800080', # Purple
+        'ff008080', # Teal
+        'ff808000', # Olive
+        'ff00aaff', # Orange
+        'ff00ffaa', # Spring Green
+        'ffaa00ff', # Pink
+    ]
+    kml_styles = []
+    kml_placemarks = []
     with atos_sqlite.get_db() as conn:
-        rows = conn.execute(q, params).fetchall()
-    # Prepare coordinates for LineString (lon,lat,alt)
-    if dz_altitude is not None:
-        coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{max(0, row['altitude_ft'] - dz_altitude)}" for row in rows)
-    else:
-        coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{row['altitude_ft']}" for row in rows)
-    # (Optional) gx:Track for time-animated playback
-    whens = '\n'.join(f"<when>{row['timestamp'].replace(' ','T')}Z</when>" for row in rows)
-    if dz_altitude is not None:
-        gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {max(0, row['altitude_ft'] - dz_altitude)}</gx:coord>" for row in rows)
-    else:
-        gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows)
-    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
-  <Document>
-    <Style id="lineStyle">
+        for idx, tag_id in enumerate(tag_ids):
+            color = colors[idx % len(colors)]
+            style_id = f"lineStyle{tag_id}"
+            kml_styles.append(f"""
+    <Style id="{style_id}">
       <LineStyle>
         <color>{color}</color>
         <width>3</width>
       </LineStyle>
-    </Style>
+    </Style>""")
+            q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
+            params = [tag_id]
+            if start is not None and start != '':
+                q += ' AND timestamp >= ?'
+                params.append(str(start))
+            if end is not None and end != '':
+                q += ' AND timestamp <= ?'
+                params.append(str(end))
+            q += ' ORDER BY timestamp'
+            rows = conn.execute(q, params).fetchall()
+            if dz_altitude is not None:
+                coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{max(0, row['altitude_ft'] - dz_altitude)}" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
+            else:
+                coords3d = '\n'.join(f"{row['longitude']},{row['latitude']},{row['altitude_ft']}" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
+            whens = '\n'.join(f"<when>{row['timestamp'].replace(' ','T')}Z</when>" for row in rows)
+            if dz_altitude is not None:
+                gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {max(0, row['altitude_ft'] - dz_altitude)}</gx:coord>" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
+            else:
+                gx_coords = '\n'.join(f"<gx:coord>{row['longitude']} {row['latitude']} {row['altitude_ft']}</gx:coord>" for row in rows if row['latitude'] != 9999999.0 and row['longitude'] != 9999999.0)
+            kml_placemarks.append(f"""
     <Placemark>
       <name>Tag {tag_id} Path</name>
-      <styleUrl>#lineStyle</styleUrl>
+      <styleUrl>#{style_id}</styleUrl>
       <LineString>
         <altitudeMode>relativeToGround</altitudeMode>
         <coordinates>
@@ -1099,10 +1115,9 @@ def api_db_export_kml():
         </coordinates>
       </LineString>
     </Placemark>
-    <!-- Optional gx:Track for time-animated playback -->
     <Placemark>
       <name>Tag {tag_id} Timed Track</name>
-      <styleUrl>#lineStyle</styleUrl>
+      <styleUrl>#{style_id}</styleUrl>
       <gx:MultiTrack>
         <gx:interpolate>1</gx:interpolate>
         <gx:Track>
@@ -1111,10 +1126,15 @@ def api_db_export_kml():
           {gx_coords}
         </gx:Track>
       </gx:MultiTrack>
-    </Placemark>
+    </Placemark>""")
+    kml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    {''.join(kml_styles)}
+    {''.join(kml_placemarks)}
   </Document>
 </kml>'''
-    filename = f"tag_{tag_id}_{start or 'all'}_{end or 'all'}.kml"
+    filename = f"tags_{'_'.join(map(str, tag_ids))}_{start or 'all'}_{end or 'all'}.kml"
     response = make_response(kml)
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
     response.headers['Content-Type'] = 'application/vnd.google-earth.kml+xml'

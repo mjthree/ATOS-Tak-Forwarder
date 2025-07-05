@@ -33,8 +33,8 @@
     <div class="company-brand">Historical Data Analysis & Export</div>
 </div>
 <div class="container">
-    <label for="tag-select">Select Tag:</label>
-    <select id="tag-select"></select>
+    <label for="tag-select">Select Tag(s):</label>
+    <select id="tag-select" multiple size="5"></select>
     <label for="minutes-back" style="margin-left:20px;">Previous minutes:</label>
     <input type="number" id="minutes-back" value="30" min="1" style="width:70px;">
     <button id="minutes-submit">Submit</button>
@@ -266,7 +266,12 @@ document.getElementById('export-csv').onclick = function() {
 };
 
 document.getElementById('export-kml').onclick = function() {
-    const tagId = document.getElementById('tag-select').value;
+    const tagSelect = document.getElementById('tag-select');
+    const selected = Array.from(tagSelect.selectedOptions).map(opt => opt.value);
+    if (selected.length === 0) {
+        alert('Please select at least one tag.');
+        return;
+    }
     if (!slider || tagData.length < 2) {
         alert('Slider not ready or not enough data to export.');
         return;
@@ -278,7 +283,7 @@ document.getElementById('export-kml').onclick = function() {
     }
     const color = document.getElementById('kml-color').value;
     const dzAltitude = parseFloat(document.getElementById('dz-altitude').value) || 0;
-    let url = `/api/db/export_kml?tag_id=${tagId}&color=${color}`;
+    let url = `/api/db/export_kml?tag_id=${selected.join(',')}&color=${color}`;
     url += `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&dz_altitude=${dzAltitude}`;
     console.log('Export KML URL:', url);
     window.open(url, '_blank');
