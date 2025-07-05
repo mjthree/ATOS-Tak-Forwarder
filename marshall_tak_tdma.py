@@ -1090,6 +1090,27 @@ def api_performance():
     """Get detailed performance metrics"""
     metrics = performance_monitor.get_metrics()
     health_score = performance_monitor.get_health_score()
+    # Debug: collect active tag IDs and timestamps
+    debug_active_tags = []
+    try:
+        from dateutil import parser as dateparser
+    except ImportError:
+        import datetime as dateparser
+    now = time.time()
+    with TAG_DATA_LOCK:
+        for tag_id, tag in tag_data.items():
+            ts = tag.get('timestamp')
+            if ts:
+                try:
+                    if 'T' in ts:
+                        dt = dateparser.parse(ts)
+                    else:
+                        dt = dateparser.parse(ts.replace(' ', 'T'))
+                    ts_epoch = dt.timestamp()
+                    if now - ts_epoch < 60:
+                        debug_active_tags.append({'tag_id': tag_id, 'timestamp': ts, 'age_sec': round(now - ts_epoch, 1)})
+                except Exception:
+                    continue
     error_breakdown = {
         'total_packets': stats.get('total_packets', 0),
         'rate_limited_packets': stats.get('rate_limited_packets', 0),
@@ -1100,7 +1121,8 @@ def api_performance():
         'metrics': metrics,
         'health_score': health_score,
         'status': 'healthy' if health_score >= 80 else 'warning' if health_score >= 50 else 'critical',
-        'error_breakdown': error_breakdown
+        'error_breakdown': error_breakdown,
+        'active_tag_debug': debug_active_tags
     })
 
 @app.route('/api/performance/history')
