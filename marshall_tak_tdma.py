@@ -965,51 +965,62 @@ def api_db_tags():
 
 @app.route('/api/db/tag_data')
 def api_db_tag_data():
+    import sys
+    from flask import current_app
     # Query: ?tag_id=1,2,3&start=...&end=...&minutes=...
-    tag_id_param = request.args.get('tag_id')
-    if tag_id_param is None:
-        return jsonify({'error': 'tag_id parameter is required'}), 400
-    tag_ids = [int(tid) for tid in tag_id_param.split(',') if tid.strip().isdigit()]
-    if not tag_ids:
-        return jsonify({'error': 'No valid tag IDs provided'}), 400
-    minutes = request.args.get('minutes')
-    result = {}
-    for tag_id in tag_ids:
-        start = None
-        if minutes:
-            try:
-                minutes_int = int(minutes)
-                # Get the latest timestamp for this tag
-                with atos_sqlite.get_db() as conn:
-                    row = conn.execute('SELECT MAX(timestamp) as max_ts FROM tag_events WHERE tag_id=?', (tag_id,)).fetchone()
-                    latest_ts = row['max_ts'] if row and row['max_ts'] else None
-                if latest_ts:
-                    latest_dt = dateparser.parse(latest_ts)
-                    start_dt = latest_dt - timedelta(minutes=minutes_int)
-                    start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
-            except Exception as e:
-                start = None
-        q = 'SELECT timestamp, altitude_ft, altitude FROM tag_events WHERE tag_id=? AND (altitude_ft IS NOT NULL OR altitude IS NOT NULL)'
-        params = [tag_id]
-        if start is not None and start != '':
-            q += ' AND timestamp >= ?'
-            params.append(start)
-        q += ' ORDER BY timestamp'
-        with atos_sqlite.get_db() as conn:
-            rows = conn.execute(q, params).fetchall()
-            data = []
-            for row in rows:
-                # Use altitude_ft if present, else convert altitude (meters) to feet
-                alt_ft = row['altitude_ft']
-                if alt_ft is None and row['altitude'] is not None:
-                    alt_ft = round(row['altitude'] * 3.28084, 1)
-                # Normalize timestamp to ISO 8601 with Z
-                ts = row['timestamp']
-                if ts and not ts.endswith('Z'):
-                    ts = ts.replace(' ', 'T') + 'Z'
-                data.append({'timestamp': ts, 'altitude_ft': alt_ft})
-        result[tag_id] = data
-    return jsonify(result)
+    try:
+        tag_id_param = request.args.get('tag_id')
+        if tag_id_param is None:
+            return jsonify({'error': 'tag_id parameter is required'}), 400
+        tag_ids = [int(tid) for tid in tag_id_param.split(',') if tid.strip().isdigit()]
+        if not tag_ids:
+            return jsonify({'error': 'No valid tag IDs provided'}), 400
+        minutes = request.args.get('minutes')
+        result = {}
+        for tag_id in tag_ids:
+            start = None
+            if minutes:
+                try:
+                    minutes_int = int(minutes)
+                    # Get the latest timestamp for this tag
+                    with atos_sqlite.get_db() as conn:
+                        row = conn.execute('SELECT MAX(timestamp) as max_ts FROM tag_events WHERE tag_id=?', (tag_id,)).fetchone()
+                        latest_ts = row['max_ts'] if row and row['max_ts'] else None
+                    if latest_ts:
+                        latest_dt = dateparser.parse(latest_ts)
+                        start_dt = latest_dt - timedelta(minutes=minutes_int)
+                        start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
+                except Exception as e:
+                    print(f"[ERROR] Minutes calculation: {e}", file=sys.stderr)
+                    start = None
+            q = 'SELECT timestamp, altitude_ft, altitude FROM tag_events WHERE tag_id=? AND (altitude_ft IS NOT NULL OR altitude IS NOT NULL)'
+            params = [tag_id]
+            if start is not None and start != '':
+                q += ' AND timestamp >= ?'
+                params.append(start)
+            q += ' ORDER BY timestamp'
+            with atos_sqlite.get_db() as conn:
+                rows = conn.execute(q, params).fetchall()
+                data = []
+                for row in rows:
+                    # Use altitude_ft if present, else convert altitude (meters) to feet
+                    alt_ft = row['altitude_ft']
+                    # Safely get altitude (meters) if present
+                    alt_m = row['altitude'] if 'altitude' in row.keys() else None
+                    if alt_ft is None and alt_m is not None:
+                        alt_ft = round(alt_m * 3.28084, 1)
+                    # Normalize timestamp to ISO 8601 with Z
+                    ts = row['timestamp']
+                    if ts and not ts.endswith('Z'):
+                        ts = ts.replace(' ', 'T') + 'Z'
+                    data.append({'timestamp': ts, 'altitude_ft': alt_ft})
+                result[tag_id] = data
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] /api/db/tag_data: {e}", file=sys.stderr)
+        traceback.print_exc()
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
 @app.route('/api/db/export_csv')
 def api_db_export_csv():
