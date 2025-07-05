@@ -417,8 +417,8 @@ function setupSlider() {
         range: { min: 0, max: sliderLabels.length - 1 },
         step: 1,
         tooltips: [
-            { to: v => formatMSTTime(sliderLabels[Math.round(v)]), from: Number },
-            { to: v => formatMSTTime(sliderLabels[Math.round(v)]), from: Number }
+            { to: v => formatMSTTime(sliderLabels[Math.round(v)] || ''), from: Number },
+            { to: v => formatMSTTime(sliderLabels[Math.round(v)] || ''), from: Number }
         ],
         format: {
             to: v => Math.round(v),
@@ -627,6 +627,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
 // Helper to extract and format time as 12-hour with AM/PM from MST timestamp string (no Date() used)
 function formatMSTTime(ts) {
+    if (typeof ts !== 'string') return '';
     const match = ts.match(/T(\d{2}):(\d{2}):(\d{2})/);
     if (match) {
         let hour = +match[1] % 12 || 12;
