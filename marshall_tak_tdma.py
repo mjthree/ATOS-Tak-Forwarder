@@ -993,7 +993,7 @@ def api_db_tag_data():
                 except Exception as e:
                     print(f"[ERROR] Minutes calculation: {e}", file=sys.stderr)
                     start = None
-            q = 'SELECT timestamp, altitude_ft, altitude FROM tag_events WHERE tag_id=? AND (altitude_ft IS NOT NULL OR altitude IS NOT NULL)'
+            q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
             params = [tag_id]
             if start is not None and start != '':
                 q += ' AND timestamp >= ?'
@@ -1003,13 +1003,7 @@ def api_db_tag_data():
                 rows = conn.execute(q, params).fetchall()
                 data = []
                 for row in rows:
-                    # Use altitude_ft if present, else convert altitude (meters) to feet
                     alt_ft = row['altitude_ft']
-                    # Safely get altitude (meters) if present
-                    alt_m = row['altitude'] if 'altitude' in row.keys() else None
-                    if alt_ft is None and alt_m is not None:
-                        alt_ft = round(alt_m * 3.28084, 1)
-                    # Normalize timestamp to ISO 8601 with Z
                     ts = row['timestamp']
                     if ts and not ts.endswith('Z'):
                         ts = ts.replace(' ', 'T') + 'Z'
