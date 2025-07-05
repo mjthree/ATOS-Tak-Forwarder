@@ -334,6 +334,18 @@
         </div>
     </div>
 
+    <!-- Console Log Window -->
+    <div class="container-fluid mt-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-terminal"></i> Program Console Log</h5>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <pre id="console-log" style="background:#111;color:#0f0;font-family:monospace;font-size:1em;height:220px;overflow-y:auto;margin:0;padding:12px;">Loading log...</pre>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let performanceChart, resourceChart;
@@ -584,6 +596,17 @@
                 clearInterval(refreshInterval);
             }
         });
+
+        // Console log streaming
+        function fetchConsoleLog() {
+            fetch('/api/logs/tail').then(r => r.text()).then(text => {
+                const logElem = document.getElementById('console-log');
+                logElem.textContent = text;
+                logElem.scrollTop = logElem.scrollHeight;
+            });
+        }
+        setInterval(fetchConsoleLog, 2000);
+        window.addEventListener('DOMContentLoaded', fetchConsoleLog);
     </script>
 </body>
 </html> 

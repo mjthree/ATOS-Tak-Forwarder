@@ -1928,6 +1928,25 @@ def api_download_logs():
     except Exception as e:
         return jsonify({'error': f'Error downloading log file: {e}'}), 500
 
+@app.route('/api/logs/tail')
+def api_logs_tail():
+    import os
+    log_path = str(COMPREHENSIVE_LOG_FILE)
+    if not os.path.exists(log_path):
+        # Fallback: find any .log or .jsonl file in comprehensive_logs
+        log_dir = os.path.dirname(log_path)
+        files = [f for f in os.listdir(log_dir) if f.endswith('.log') or f.endswith('.jsonl')]
+        if files:
+            log_path = os.path.join(log_dir, sorted(files)[-1])
+        else:
+            return 'No log file found.'
+    try:
+        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()[-100:]
+        return ''.join(lines), 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        return f'Error reading log: {e}', 500, {'Content-Type': 'text/plain; charset=utf-8'}
+
 # Protect all admin API endpoints
 def protect_admin_api():
     from flask import request
