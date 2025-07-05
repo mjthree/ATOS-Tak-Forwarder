@@ -330,8 +330,7 @@ function drawChart() {
                     title: { display: true, text: 'Time (MST)' },
                     ticks: {
                         callback: function(value, index, ticks) {
-                            const ts = this.getLabelForValue(value);
-                            return formatMSTTime(ts);
+                            return formatMSTTime(value);
                         }
                     }
                 },
@@ -409,20 +408,21 @@ function setupSlider() {
     allTimestamps.sort((a, b) => a - b);
     const minTs = allTimestamps[0];
     const maxTs = allTimestamps[allTimestamps.length - 1];
+    const sliderLabels = allTimestamps.sort().map(ts => ts); // MST timestamp strings
     sliderDiv.innerHTML = '<div id="slider-el"></div>';
     slider = document.getElementById('slider-el');
     noUiSlider.create(slider, {
-        start: [minTs, maxTs],
+        start: [0, sliderLabels.length - 1],
         connect: true,
-        range: { min: minTs, max: maxTs },
-        step: 1000, // 1 second
+        range: { min: 0, max: sliderLabels.length - 1 },
+        step: 1,
         tooltips: [
-            { to: v => formatMSTTime(v), from: String },
-            { to: v => formatMSTTime(v), from: String }
+            { to: v => formatMSTTime(sliderLabels[Math.round(v)]), from: Number },
+            { to: v => formatMSTTime(sliderLabels[Math.round(v)]), from: Number }
         ],
         format: {
-            to: v => v,
-            from: String
+            to: v => Math.round(v),
+            from: Number
         }
     });
     slider.noUiSlider.on('update', function(values, handle) {
@@ -435,15 +435,26 @@ function setupSlider() {
 function zoomChartToSlider() {
     const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
     if (!slider || !selected.length) return;
-    let [startMs, endMs] = slider.noUiSlider.get().map(Number);
-    if (startMs > endMs) [startMs, endMs] = [endMs, startMs];
-    // For each selected tag, filter data to the slider time window
+    let [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
+    // Clamp indices to valid range
+    startIdx = Math.max(0, Math.min(startIdx, tagData.length - 1));
+    endIdx = Math.max(0, Math.min(endIdx, tagData.length - 1));
+    if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
+    let start = tagData[startIdx]?.timestamp;
+    let end = tagData[endIdx]?.timestamp;
+    // Fallback if indices are still invalid
+    if (!start) start = tagData[0]?.timestamp;
+    if (!end) end = tagData[tagData.length-1]?.timestamp;
+    console.log('Slider:', slider, 'tagData.length:', tagData.length);
+    console.log('Slider get:', slider ? slider.noUiSlider.get() : null);
+    console.log('tagData[0]:', tagData[0], 'tagData[tagData.length-1]:', tagData[tagData.length-1]);
+    console.log('Computed start/end:', start, end);
     let allLabels = new Set();
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
         dataArr.forEach(d => {
             const t = new Date(d.timestamp).getTime();
-            if (t >= startMs && t <= endMs) allLabels.add(d.timestamp);
+            if (t >= start && t <= end) allLabels.add(d.timestamp);
         });
     });
     const sortedLabels = Array.from(allLabels).sort();
@@ -499,8 +510,7 @@ function zoomChartToSlider() {
                     title: { display: true, text: 'Time (MST)' },
                     ticks: {
                         callback: function(value, index, ticks) {
-                            const ts = this.getLabelForValue(value);
-                            return formatMSTTime(ts);
+                            return formatMSTTime(value);
                         }
                     }
                 },
@@ -615,7 +625,7 @@ window.addEventListener('DOMContentLoaded', function() {
     };
 });
 
-// Helper to extract and format time as 12-hour with AM/PM from MST timestamp string
+// Helper to extract and format time as 12-hour with AM/PM from MST timestamp string (no Date() used)
 function formatMSTTime(ts) {
     const match = ts.match(/T(\d{2}):(\d{2}):(\d{2})/);
     if (match) {
