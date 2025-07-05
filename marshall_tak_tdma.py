@@ -1087,7 +1087,7 @@ def api_stats():
 
 @app.route('/api/performance')
 def api_performance():
-    """Get detailed performance metrics"""
+    performance_monitor.update_metrics()  # Force update to ensure fresh metrics
     metrics = performance_monitor.get_metrics()
     health_score = performance_monitor.get_health_score()
     # Debug: collect active tag IDs and timestamps
