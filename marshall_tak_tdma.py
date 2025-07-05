@@ -1450,6 +1450,23 @@ def view_kml():
     # Just render the template; JS will read query params from the URL
     return render_template('view_kml.html')
 
+@app.route('/api/config/dz_altitude', methods=['GET'])
+def get_dz_altitude():
+    settings = load_settings()
+    dz = settings.get('dz_altitude', 1893)
+    return {'dz_altitude': dz}
+
+@app.route('/api/config/dz_altitude', methods=['POST'])
+def set_dz_altitude():
+    data = request.get_json()
+    dz = data.get('dz_altitude')
+    if dz is None:
+        return {'error': 'Missing dz_altitude'}, 400
+    settings = load_settings()
+    settings['dz_altitude'] = dz
+    save_settings(settings)
+    return {'dz_altitude': dz}
+
 # Protect all admin API endpoints
 def protect_admin_api():
     from flask import request
