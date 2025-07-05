@@ -334,15 +334,6 @@
                     <li><b>Load (Merge/Overwrite):</b> Merge adds data from an archive to the current DB (matching columns by name). Overwrite replaces the current DB with the archive (the current DB is always backed up first).</li>
                     <li><b>Delete:</b> Permanently deletes an archived database file.</li>
                 </ul>
-                <b>Tips for Proper Use:</b>
-                <ul style="margin-top:8px;">
-                    <li>For large databases, some operations may take time. Please wait for confirmation before refreshing or closing the page.</li>
-                    <li>For best results, <b>stop the ATOS service</b> before archiving, overwriting, or merging databases to avoid lock errors.</li>
-                    <li>After restoring or merging, restart the service and refresh this page to see updated data.</li>
-                    <li>To confirm archive deletion, check the <code>database_archives/</code> folder on disk.</li>
-                </ul>
-                <b>Security:</b> This admin panel is password protected. Only users with the admin password can access these controls.<br>
-                <b>Default password:</b> <code>apex123APEX!@#</code>
             </div>
         </div>
         
