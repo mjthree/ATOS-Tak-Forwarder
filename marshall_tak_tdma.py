@@ -1111,6 +1111,7 @@ def api_performance():
                         debug_active_tags.append({'tag_id': tag_id, 'timestamp': ts, 'age_sec': round(now - ts_epoch, 1)})
                 except Exception:
                     continue
+    metrics['active_connections'] = len(debug_active_tags)
     error_breakdown = {
         'total_packets': stats.get('total_packets', 0),
         'rate_limited_packets': stats.get('rate_limited_packets', 0),
