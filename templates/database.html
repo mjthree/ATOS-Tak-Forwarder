@@ -319,7 +319,7 @@ function drawChart() {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            return context[0].label;
+                            return formatMSTTime(context[0].label);
                         }
                     }
                 }
@@ -331,8 +331,7 @@ function drawChart() {
                     ticks: {
                         callback: function(value, index, ticks) {
                             const ts = this.getLabelForValue(value);
-                            const match = ts.match(/T(\d{2}:\d{2}:\d{2})/);
-                            return match ? match[1] : ts;
+                            return formatMSTTime(ts);
                         }
                     }
                 },
@@ -418,12 +417,12 @@ function setupSlider() {
         range: { min: minTs, max: maxTs },
         step: 1000, // 1 second
         tooltips: [
-            { to: v => v, from: Number },
-            { to: v => v, from: Number }
+            { to: v => formatMSTTime(v), from: String },
+            { to: v => formatMSTTime(v), from: String }
         ],
         format: {
-            to: v => Math.round(v),
-            from: Number
+            to: v => v,
+            from: String
         }
     });
     slider.noUiSlider.on('update', function(values, handle) {
@@ -489,7 +488,7 @@ function zoomChartToSlider() {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            return context[0].label;
+                            return formatMSTTime(context[0].label);
                         }
                     }
                 }
@@ -501,8 +500,7 @@ function zoomChartToSlider() {
                     ticks: {
                         callback: function(value, index, ticks) {
                             const ts = this.getLabelForValue(value);
-                            const match = ts.match(/T(\d{2}:\d{2}:\d{2})/);
-                            return match ? match[1] : ts;
+                            return formatMSTTime(ts);
                         }
                     }
                 },
@@ -616,6 +614,17 @@ window.addEventListener('DOMContentLoaded', function() {
         drawChart();
     };
 });
+
+// Helper to extract and format time as 12-hour with AM/PM from MST timestamp string
+function formatMSTTime(ts) {
+    const match = ts.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    if (match) {
+        let hour = +match[1] % 12 || 12;
+        let ampm = +match[1] < 12 ? 'AM' : 'PM';
+        return `${hour}:${match[2]} ${ampm}`;
+    }
+    return ts;
+}
 
 fetchTags();
 </script>
