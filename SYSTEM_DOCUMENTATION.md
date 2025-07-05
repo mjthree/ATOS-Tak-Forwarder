@@ -14,6 +14,8 @@
 
 ---
 
+**Note:** All exported data and UI displays use the America/Phoenix timezone (MST). The backend converts UTC timestamps before sending them.
+
 ## 🏗️ System Architecture
 
 ### Overview
