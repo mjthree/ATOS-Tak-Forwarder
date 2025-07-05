@@ -150,6 +150,7 @@
     </div>
 </div>
 <script>
+const TIME_ZONE = 'America/Phoenix';
 const TAG_COLORS = [
     {name:'Red',color:'rgba(255,0,0,0.7)',kml:'ff0000ff'},
     {name:'Green',color:'rgba(0,255,0,0.7)',kml:'ff00ff00'},
@@ -324,7 +325,7 @@ function drawChart() {
                     callbacks: {
                         title: function(context) {
                             const d = new Date(cleanTimestamp(context[0].label));
-                            return d.toLocaleString();
+                            return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
                         }
                     }
                 }
@@ -333,11 +334,12 @@ function drawChart() {
                 x: {
                     type: 'time',
                     time: { unit: 'second' },
+                    adapters: { date: { zone: TIME_ZONE } },
                     title: { display: true, text: 'Time' },
                     ticks: {
                         callback: function(value, index, ticks) {
                             const d = new Date(cleanTimestamp(this.getLabelForValue(value)));
-                            return d.toLocaleTimeString();
+                            return d.toLocaleTimeString('en-US', { timeZone: TIME_ZONE });
                         }
                     }
                 },
@@ -425,11 +427,11 @@ function setupSlider() {
         tooltips: [
             { to: v => {
                 const d = new Date(Number(v));
-                return d.toLocaleString();
+                return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
             }, from: Number },
             { to: v => {
                 const d = new Date(Number(v));
-                return d.toLocaleString();
+                return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
             }, from: Number }
         ],
         format: {
@@ -501,7 +503,7 @@ function zoomChartToSlider() {
                     callbacks: {
                         title: function(context) {
                             const d = new Date(cleanTimestamp(context[0].label));
-                            return d.toLocaleString();
+                            return d.toLocaleString('en-US', { timeZone: TIME_ZONE });
                         }
                     }
                 }
@@ -510,11 +512,12 @@ function zoomChartToSlider() {
                 x: {
                     type: 'time',
                     time: { unit: 'second' },
+                    adapters: { date: { zone: TIME_ZONE } },
                     title: { display: true, text: 'Time' },
                     ticks: {
                         callback: function(value, index, ticks) {
                             const d = new Date(cleanTimestamp(this.getLabelForValue(value)));
-                            return d.toLocaleTimeString();
+                            return d.toLocaleTimeString('en-US', { timeZone: TIME_ZONE });
                         }
                     }
                 },
