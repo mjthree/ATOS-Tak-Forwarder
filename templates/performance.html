@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATOS TAK Forwarder - Performance Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .health-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #28a745;
+        }
+        .health-card.warning {
+            border-left-color: #ffc107;
+        }
+        .health-card.critical {
+            border-left-color: #dc3545;
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .metric-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .alert-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-connected { background-color: #28a745; }
+        .status-disconnected { background-color: #dc3545; }
+        .status-warning { background-color: #ffc107; }
+        .performance-chart {
+            height: 300px;
+        }
+        .refresh-indicator {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row bg-white shadow-sm py-3 mb-4">
+            <div class="col">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-0">
+                            <i class="fas fa-tachometer-alt text-primary"></i>
+                            Performance Monitor
+                        </h1>
+                        <p class="text-muted mb-0">Real-time system health and performance metrics</p>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <button id="refreshBtn" class="btn btn-outline-primary me-3">
+                            <i class="fas fa-sync-alt" id="refreshIcon"></i>
+                            Refresh
+                        </button>
+                        <a href="/" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i>
+                            Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Health Overview -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card health-card" id="healthCard">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value" id="healthScore">--</div>
+                                    <div class="metric-label">Health Score</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value" id="uptime">--</div>
+                                    <div class="metric-label">Uptime</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value" id="activeTags">--</div>
+                                    <div class="metric-label">Active Tags</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="metric-value" id="status">--</div>
+                                    <div class="metric-label">System Status</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-memory fa-2x text-info mb-2"></i>
+                        <div class="metric-value" id="memoryUsage">--</div>
+                        <div class="metric-label">Memory Usage (MB)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-microchip fa-2x text-warning mb-2"></i>
+                        <div class="metric-value" id="cpuUsage">--</div>
+                        <div class="metric-label">CPU Usage (%)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-database fa-2x text-success mb-2"></i>
+                        <div class="metric-value" id="dbSize">--</div>
+                        <div class="metric-label">Database Size (MB)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-hdd fa-2x text-secondary mb-2"></i>
+                        <div class="metric-value" id="diskUsage">--</div>
+                        <div class="metric-label">Disk Usage (%)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-plug"></i>
+                            Connection Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <span class="status-indicator" id="serialStatus"></span>
+                            <span>Serial Connection</span>
+                        </div>
+                        <div class="mb-2">
+                            <span class="status-indicator" id="takStatus"></span>
+                            <span>TAK Server</span>
+                        </div>
+                        <div class="mb-2">
+                            <span class="status-indicator" id="multicastStatus"></span>
+                            <span>Multicast</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line"></i>
+                            Processing Rates
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <strong>Packet Processing:</strong>
+                            <span id="packetRate">--</span> packets/sec
+                        </div>
+                        <div class="mb-2">
+                            <strong>UDP Send Rate:</strong>
+                            <span id="udpRate">--</span> sends/sec
+                        </div>
+                        <div class="mb-2">
+                            <strong>Error Rate:</strong>
+                            <span id="errorRate">--</span>%
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Active Alerts
+                            <span class="alert-badge" id="alertCount" style="display: none;">0</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="alertsList">
+                            <p class="text-muted">No active alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Charts -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-area"></i>
+                            System Performance (Last Hour)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="performanceChart" class="performance-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie"></i>
+                            Resource Utilization
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="resourceChart" class="performance-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historical Data -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-history"></i>
+                            Historical Performance Data
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <select id="historyRange" class="form-select">
+                                    <option value="15">Last 15 minutes</option>
+                                    <option value="30">Last 30 minutes</option>
+                                    <option value="60" selected>Last hour</option>
+                                    <option value="240">Last 4 hours</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button id="exportHistory" class="btn btn-outline-secondary">
+                                    <i class="fas fa-download"></i>
+                                    Export Data
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Health Score</th>
+                                        <th>Memory (MB)</th>
+                                        <th>CPU (%)</th>
+                                        <th>Queue (%)</th>
+                                        <th>Error Rate (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTable">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let performanceChart, resourceChart;
+        let refreshInterval;
+
+        // Initialize charts
+        function initCharts() {
+            const ctx1 = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Health Score',
+                        data: [],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Memory Usage (MB)',
+                        data: [],
+                        borderColor: '#17a2b8',
+                        backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            const ctx2 = document.getElementById('resourceChart').getContext('2d');
+            resourceChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Memory', 'CPU', 'Queue', 'Available'],
+                    datasets: [{
+                        data: [0, 0, 0, 100],
+                        backgroundColor: [
+                            '#17a2b8',
+                            '#ffc107',
+                            '#dc3545',
+                            '#6c757d'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        // Update performance data
+        async function updatePerformance() {
+            try {
+                const response = await fetch('/api/performance');
+                const data = await response.json();
+                
+                updateHealthCard(data);
+                updateMetrics(data.metrics);
+                updateConnectionStatus(data.metrics);
+                updateCharts(data.metrics);
+                
+            } catch (error) {
+                console.error('Error updating performance data:', error);
+            }
+        }
+
+        // Update health card
+        function updateHealthCard(data) {
+            const healthCard = document.getElementById('healthCard');
+            const healthScore = document.getElementById('healthScore');
+            const uptime = document.getElementById('uptime');
+            const activeTags = document.getElementById('activeTags');
+            const status = document.getElementById('status');
+
+            healthScore.textContent = data.health_score;
+            uptime.textContent = formatUptime(data.metrics.system_uptime);
+            activeTags.textContent = data.metrics.active_connections;
+            status.textContent = data.status.toUpperCase();
+
+            // Update card styling
+            healthCard.className = 'card health-card';
+            if (data.status === 'warning') {
+                healthCard.classList.add('warning');
+            } else if (data.status === 'critical') {
+                healthCard.classList.add('critical');
+            }
+        }
+
+        // Update metrics
+        function updateMetrics(metrics) {
+            document.getElementById('memoryUsage').textContent = metrics.memory_usage_mb;
+            document.getElementById('cpuUsage').textContent = metrics.cpu_usage_percent;
+            document.getElementById('dbSize').textContent = metrics.database_size_mb;
+            document.getElementById('diskUsage').textContent = metrics.disk_usage_percent;
+            document.getElementById('packetRate').textContent = metrics.packet_processing_rate;
+            document.getElementById('udpRate').textContent = metrics.udp_send_rate;
+            document.getElementById('errorRate').textContent = metrics.error_rate;
+        }
+
+        // Update connection status
+        function updateConnectionStatus(metrics) {
+            updateStatusIndicator('serialStatus', metrics.serial_connection_status);
+            updateStatusIndicator('takStatus', metrics.tak_server_status);
+            updateStatusIndicator('multicastStatus', metrics.multicast_status);
+        }
+
+        function updateStatusIndicator(elementId, status) {
+            const element = document.getElementById(elementId);
+            element.className = 'status-indicator';
+            
+            if (status === 'connected') {
+                element.classList.add('status-connected');
+            } else if (status === 'disconnected') {
+                element.classList.add('status-disconnected');
+            } else {
+                element.classList.add('status-warning');
+            }
+        }
+
+        // Update charts
+        function updateCharts(metrics) {
+            const now = new Date().toLocaleTimeString();
+            
+            // Update performance chart
+            performanceChart.data.labels.push(now);
+            performanceChart.data.datasets[0].data.push(metrics.health_score || 0);
+            performanceChart.data.datasets[1].data.push(metrics.memory_usage_mb || 0);
+            
+            if (performanceChart.data.labels.length > 20) {
+                performanceChart.data.labels.shift();
+                performanceChart.data.datasets[0].data.shift();
+                performanceChart.data.datasets[1].data.shift();
+            }
+            
+            performanceChart.update();
+
+            // Update resource chart
+            const memory = metrics.memory_usage_mb || 0;
+            const cpu = metrics.cpu_usage_percent || 0;
+            const queue = metrics.queue_utilization || 0;
+            const available = Math.max(0, 100 - memory - cpu - queue);
+            
+            resourceChart.data.datasets[0].data = [memory, cpu, queue, available];
+            resourceChart.update();
+        }
+
+        // Format uptime
+        function formatUptime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}h ${minutes}m`;
+        }
+
+        // Load historical data
+        async function loadHistory() {
+            const range = document.getElementById('historyRange').value;
+            try {
+                const response = await fetch(`/api/performance/history?minutes=${range}`);
+                const data = await response.json();
+                updateHistoryTable(data.history);
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+
+        // Update history table
+        function updateHistoryTable(history) {
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = '';
+            
+            history.slice(-10).reverse().forEach(entry => {
+                const row = document.createElement('tr');
+                const timestamp = new Date(entry.timestamp * 1000).toLocaleString();
+                const metrics = entry.metrics;
+                
+                row.innerHTML = `
+                    <td>${timestamp}</td>
+                    <td>${metrics.health_score || 0}</td>
+                    <td>${metrics.memory_usage_mb || 0}</td>
+                    <td>${metrics.cpu_usage_percent || 0}</td>
+                    <td>${metrics.queue_utilization || 0}</td>
+                    <td>${metrics.error_rate || 0}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Export history data
+        function exportHistoryData() {
+            const range = document.getElementById('historyRange').value;
+            const link = document.createElement('a');
+            link.href = `/api/performance/history?minutes=${range}&format=csv`;
+            link.download = `performance_history_${range}min.csv`;
+            link.click();
+        }
+
+        // Refresh button handler
+        function handleRefresh() {
+            const icon = document.getElementById('refreshIcon');
+            icon.classList.add('refresh-indicator');
+            
+            Promise.all([updatePerformance(), loadHistory()]).finally(() => {
+                setTimeout(() => {
+                    icon.classList.remove('refresh-indicator');
+                }, 1000);
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updatePerformance();
+            loadHistory();
+            
+            // Set up refresh interval
+            refreshInterval = setInterval(updatePerformance, 5000);
+            
+            // Event listeners
+            document.getElementById('refreshBtn').addEventListener('click', handleRefresh);
+            document.getElementById('historyRange').addEventListener('change', loadHistory);
+            document.getElementById('exportHistory').addEventListener('click', exportHistoryData);
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html> 

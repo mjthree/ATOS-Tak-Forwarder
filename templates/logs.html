@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATOS TAK Forwarder - Log Viewer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+        }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e9ecef;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .control-group label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #495057;
+            font-size: 14px;
+        }
+        
+        select, input, button {
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .danger-button {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+        
+        .danger-button:hover {
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .log-container {
+            height: 600px;
+            overflow-y: auto;
+            padding: 20px 30px;
+            background: #1e1e1e;
+            color: #f8f8f2;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 4px solid transparent;
+            transition: background-color 0.2s ease;
+        }
+        
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .log-entry.ERROR {
+            background: rgba(231, 76, 60, 0.1);
+            border-left-color: #e74c3c;
+        }
+        
+        .log-entry.WARNING {
+            background: rgba(243, 156, 18, 0.1);
+            border-left-color: #f39c12;
+        }
+        
+        .log-entry.INFO {
+            background: rgba(52, 152, 219, 0.1);
+            border-left-color: #3498db;
+        }
+        
+        .log-entry.UNKNOWN {
+            background: rgba(149, 165, 166, 0.1);
+            border-left-color: #95a5a6;
+        }
+        
+        .log-timestamp {
+            color: #95a5a6;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .log-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-right: 10px;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .log-level.ERROR {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .log-level.WARNING {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .log-level.INFO {
+            background: #3498db;
+            color: white;
+        }
+        
+        .log-level.UNKNOWN {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .log-message {
+            color: #f8f8f2;
+        }
+        
+        .status-bar {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+        }
+        
+        .status-indicator.error {
+            background: #dc3545;
+        }
+        
+        .status-indicator.warning {
+            background: #ffc107;
+        }
+        
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 30px;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .file-info {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Log Viewer</h1>
+            <div>
+                <a href="/" style="color: white; text-decoration: none; margin-right: 20px;">🏠 Dashboard</a>
+                <a href="/admin" style="color: white; text-decoration: none;">⚙️ Admin</a>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="logFile">Log File:</label>
+                <select id="logFile">
+                    <option value="atos_forwarder.log">atos_forwarder.log</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="severity">Severity Level:</label>
+                <select id="severity">
+                    <option value="">All Levels</option>
+                    <option value="ERROR">Error</option>
+                    <option value="WARNING">Warning</option>
+                    <option value="INFO">Info</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="lines">Lines to Show:</label>
+                <select id="lines">
+                    <option value="50">50</option>
+                    <option value="100" selected>100</option>
+                    <option value="200">200</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button onclick="refreshLogs()">🔄 Refresh</button>
+            </div>
+            
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button onclick="clearLogs()" class="danger-button">🗑️ Clear Logs</button>
+            </div>
+            
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button onclick="downloadLogs()">📥 Download</button>
+            </div>
+        </div>
+        
+        <div id="fileInfo" class="file-info" style="display: none;"></div>
+        
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        
+        <div id="logContainer" class="log-container">
+            <div class="loading">Loading logs...</div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">Connected</span>
+            </div>
+            
+            <div class="auto-refresh">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="autoRefresh" checked>
+                    <label for="autoRefresh">Auto-refresh (5s)</label>
+                </div>
+                <span id="lastUpdate">Last update: Never</span>
+            </div>
+            
+            <div class="status-item">
+                <span id="entryCount">0 entries</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+        let currentFile = 'atos_forwarder.log';
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadLogFiles();
+            refreshLogs();
+            startAutoRefresh();
+        });
+        
+        // Event listeners
+        document.getElementById('logFile').addEventListener('change', function() {
+            currentFile = this.value;
+            refreshLogs();
+        });
+        
+        document.getElementById('severity').addEventListener('change', refreshLogs);
+        document.getElementById('lines').addEventListener('change', refreshLogs);
+        document.getElementById('autoRefresh').addEventListener('change', function() {
+            if (this.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+        
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(refreshLogs, 5000);
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+        
+        async function loadLogFiles() {
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+                
+                const logFileSelect = document.getElementById('logFile');
+                logFileSelect.innerHTML = '';
+                
+                data.available_files.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file.name;
+                    option.textContent = `${file.name} (${formatFileSize(file.size)})`;
+                    logFileSelect.appendChild(option);
+                });
+                
+                // Show file info
+                const fileInfo = document.getElementById('fileInfo');
+                if (data.available_files.length > 0) {
+                    const currentFileData = data.available_files.find(f => f.name === data.current_file);
+                    if (currentFileData) {
+                        fileInfo.innerHTML = `
+                            <strong>Current file:</strong> ${currentFileData.name} 
+                            (${formatFileSize(currentFileData.size)}, modified: ${new Date(currentFileData.modified).toLocaleString()})
+                        `;
+                        fileInfo.style.display = 'block';
+                    }
+                }
+                
+            } catch (error) {
+                showError('Failed to load log files: ' + error.message);
+            }
+        }
+        
+        async function refreshLogs() {
+            try {
+                updateStatus('Loading...', 'warning');
+                
+                const severity = document.getElementById('severity').value;
+                const lines = document.getElementById('lines').value;
+                
+                const params = new URLSearchParams({
+                    file: currentFile,
+                    lines: lines
+                });
+                
+                if (severity) {
+                    params.append('severity', severity);
+                }
+                
+                const response = await fetch(`/api/logs?${params}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayLogs(data.entries);
+                    updateStatus('Connected', 'success');
+                    document.getElementById('entryCount').textContent = `${data.total_entries} entries`;
+                    document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+                    hideError();
+                } else {
+                    throw new Error(data.error || 'Failed to fetch logs');
+                }
+                
+            } catch (error) {
+                showError('Failed to refresh logs: ' + error.message);
+                updateStatus('Error', 'error');
+            }
+        }
+        
+        function displayLogs(entries) {
+            const container = document.getElementById('logContainer');
+            
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="loading">No log entries found</div>';
+                return;
+            }
+            
+            container.innerHTML = entries.map(entry => `
+                <div class="log-entry ${entry.level}">
+                    <span class="log-timestamp">${entry.timestamp}</span>
+                    <span class="log-level ${entry.level}">${entry.level}</span>
+                    <span class="log-message">${escapeHtml(entry.message)}</span>
+                </div>
+            `).join('');
+            
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        async function clearLogs() {
+            if (!confirm('Are you sure you want to clear the current log file? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/logs/clear?file=${currentFile}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Log file cleared successfully');
+                    refreshLogs();
+                } else {
+                    throw new Error(data.error || 'Failed to clear logs');
+                }
+                
+            } catch (error) {
+                showError('Failed to clear logs: ' + error.message);
+            }
+        }
+        
+        function downloadLogs() {
+            window.open(`/api/logs/download?file=${currentFile}`, '_blank');
+        }
+        
+        function updateStatus(text, type) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            
+            statusText.textContent = text;
+            indicator.className = 'status-indicator ' + type;
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html> 

@@ -33,25 +33,42 @@ if [ ! -f "marshall_tak_tdma.py" ]; then
     exit 1
 fi
 
+# Install system dependencies
+echo "📦 Installing system dependencies..."
+apt update
+apt install -y python3-pip python3-venv git curl wget
+
 # Install Python dependencies if needed
 echo "🐍 Checking Python dependencies..."
-if ! python3 -c "import flask, serial" 2>/dev/null; then
+if ! python3 -c "import flask, serial, psutil" 2>/dev/null; then
     echo "📦 Installing Python dependencies..."
     if [ -f "requirements.txt" ]; then
         pip3 install --break-system-packages -r requirements.txt
+        # Install additional dependencies not in requirements.txt
+        pip3 install --break-system-packages psutil python-dateutil
     else
-        pip3 install --break-system-packages flask pyserial
+        pip3 install --break-system-packages flask pyserial psutil python-dateutil werkzeug
     fi
 else
     echo "✅ Python dependencies already installed"
 fi
 
+# Create necessary directories
+echo "📁 Creating necessary directories..."
+mkdir -p comprehensive_logs
+mkdir -p database_archives
+mkdir -p backups
+
+# Set proper permissions
+echo "🔐 Setting file permissions..."
+chmod +x marshall_tak_tdma.py
+chmod 600 *.json 2>/dev/null || true
+chmod 755 templates/ 2>/dev/null || true
+chmod 644 templates/*.html 2>/dev/null || true
+
 # Copy service file to systemd directory
 echo "🔧 Installing systemd service..."
 cp "$SERVICE_FILE" /etc/systemd/system/
-
-# Set executable permissions on the Python script
-chmod +x marshall_tak_tdma.py
 
 # Reload systemd and enable service
 systemctl daemon-reload
@@ -86,7 +103,6 @@ if [[ $setup_https =~ ^[Yy]$ ]]; then
         
         # Install mkcert
         echo "📦 Installing mkcert..."
-        apt update
         apt install -y mkcert
         
         # Install nginx
@@ -229,6 +245,8 @@ if [[ $setup_https =~ ^[Yy]$ ]]; then
     echo "   Main Interface: https://$PI_IP"
     echo "   Display Dashboard: https://$PI_IP/display"
     echo "   Database Interface: https://$PI_IP/database"
+    echo "   Performance Monitor: https://$PI_IP/performance"
+    echo "   Log Viewer: https://$PI_IP/logs"
     echo "   Admin Panel: https://$PI_IP/admin (password protected)"
     echo ""
     echo "📊 HTTP (redirects to HTTPS): http://$PI_IP"
@@ -237,6 +255,8 @@ else
     echo "   Main Interface: http://localhost:5000"
     echo "   Display Dashboard: http://localhost:5000/display"
     echo "   Database Interface: http://localhost:5000/database"
+    echo "   Performance Monitor: http://localhost:5000/performance"
+    echo "   Log Viewer: http://localhost:5000/logs"
     echo "   Admin Panel: http://localhost:5000/admin (no password)"
     echo ""
     echo "📋 To access from other devices, use your Pi's IP address"
@@ -275,11 +295,19 @@ echo "     - Archive, download, clear, and merge databases"
 echo "     - Clean up old data and invalid tags"
 echo "     - Manage archived database files"
 echo "   📊 Database Interface: Historical data analysis and export"
+echo "   📈 Performance Monitor: Real-time system health metrics"
+echo "   📋 Log Viewer: Web-based log management with filtering"
 echo "   🔒 Password Protection: Secure admin access (if HTTPS enabled)"
 echo "   📈 Advanced Logging: SQLite database with comprehensive tracking"
 echo "   🎛️  Multicast Control: Enable/disable multicast with dropdown"
 echo "   📋 Template System: Save and load configurations"
+echo "   📊 Export Capabilities: CSV and KML data export"
+echo "   🔄 Backup & Recovery: Automated backup and disaster recovery"
 echo ""
-echo "📖 See README.md for detailed documentation and troubleshooting"
-
-git pull 
+echo "📖 Documentation Available:"
+echo "   📖 System Documentation: SYSTEM_DOCUMENTATION.md"
+echo "   🚀 Deployment Guide: DEPLOYMENT_GUIDE.md"
+echo "   🔍 Troubleshooting Guide: TROUBLESHOOTING_GUIDE.md"
+echo "   📚 Main Documentation: README.md"
+echo ""
+echo "🎯 APEX SHIELD - ATOS TDMA Service Ready!" 

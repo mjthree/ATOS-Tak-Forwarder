@@ -73,6 +73,9 @@
             <input type="number" id="minutes-back" value="30" min="1" style="width:70px;">
             <button id="minutes-submit">Submit</button>
         </div>
+        <div style="margin-bottom:10px;">
+            <label><input type="checkbox" id="span-gaps-toggle" checked> Connect gaps in data (spanGaps)</label>
+        </div>
         <div id="slider"></div>
         <div id="chart-legend-row">
             <div style="flex:1;min-width:0;">
@@ -209,6 +212,7 @@ let sliderTimestamps = [];
 let sliderReady = false;
 let dataReady = false;
 let minutesBack = 30;
+let spanGapsEnabled = true;
 
 function fetchTags() {
     fetch('/api/db/tags').then(r => r.json()).then(tags => {
@@ -221,9 +225,13 @@ function fetchTags() {
             o.text = t;
             sel.appendChild(o);
         });
+        // Auto-select the first 3 tags by default
+        for (let i = 0; i < Math.min(3, tags.length); i++) {
+            sel.options[i].selected = true;
+        }
         if (tags.length > 0) {
-            sel.value = tags[0];
-            fetchTagData([tags[0]], minutesBack);
+            const selected = Array.from(sel.selectedOptions).map(opt => opt.value);
+            fetchTagData(selected, minutesBack);
         }
     });
 }
@@ -278,14 +286,15 @@ function drawChart() {
         // Align data to master label list
         const altitudes = sortedLabels.map(ts => tsToAlt.hasOwnProperty(ts) ? tsToAlt[ts] : null);
         allAltitudes = allAltitudes.concat(altitudes.filter(a => a !== null));
+        let userColor = localStorage.getItem('tagColor_' + tagId) || color;
         datasets.push({
             label: `Tag ${tagId}`,
             data: altitudes,
-            borderColor: color,
-            backgroundColor: color.replace('0.7','0.15'),
+            borderColor: userColor,
+            backgroundColor: userColor.replace('0.7','0.15'),
             pointRadius: 1,
             fill: true,
-            spanGaps: true,
+            spanGaps: spanGapsEnabled,
         });
     });
     // Debug log for chart data
@@ -319,12 +328,52 @@ function drawChart() {
 function updateLegend(selected) {
     const legend = document.getElementById('legend-list');
     legend.innerHTML = '';
+    // Show warning if tag count exceeds color palette
+    let warningDiv = document.getElementById('legend-warning');
+    if (!warningDiv) {
+        warningDiv = document.createElement('div');
+        warningDiv.id = 'legend-warning';
+        legend.parentNode.insertBefore(warningDiv, legend);
+    }
+    if (selected.length > TAG_COLORS.length) {
+        warningDiv.innerHTML = '<span style="color:red;font-weight:bold;">Warning: More tags than colors! Some lines will share colors. (Consider user-defined color overrides.)</span>';
+    } else {
+        warningDiv.innerHTML = '';
+    }
     selected.forEach((tagId, idx) => {
-        const color = TAG_COLORS[idx % TAG_COLORS.length].color;
+        // User-defined color override
+        let userColor = localStorage.getItem('tagColor_' + tagId);
+        if (!userColor) userColor = TAG_COLORS[idx % TAG_COLORS.length].color;
         const li = document.createElement('li');
-        li.innerHTML = `<span class="legend-color" style="background:${color}"></span>Tag ${tagId}`;
+        li.innerHTML = `<span class="legend-color" style="background:${userColor}"></span>Tag ${tagId} <input type="color" value="${rgbToHex(userColor)}" data-tag="${tagId}" class="tag-color-picker" style="margin-left:8px;vertical-align:middle;width:24px;height:24px;border:none;">`;
         legend.appendChild(li);
     });
+    // Add event listeners for color pickers
+    document.querySelectorAll('.tag-color-picker').forEach(input => {
+        input.oninput = function() {
+            const tagId = this.getAttribute('data-tag');
+            localStorage.setItem('tagColor_' + tagId, hexToRgba(this.value));
+            drawChart();
+        };
+    });
+}
+
+// Helper: Convert rgba() to hex
+function rgbToHex(rgba) {
+    if (rgba.startsWith('rgba')) {
+        const parts = rgba.match(/\d+/g);
+        if (!parts) return '#ff0000';
+        return '#' + parts.slice(0,3).map(x => (+x).toString(16).padStart(2,'0')).join('');
+    }
+    return rgba;
+}
+// Helper: Convert hex to rgba with default alpha
+function hexToRgba(hex) {
+    if (!hex.startsWith('#')) return hex;
+    const r = parseInt(hex.substr(1,2),16);
+    const g = parseInt(hex.substr(3,2),16);
+    const b = parseInt(hex.substr(5,2),16);
+    return `rgba(${r},${g},${b},0.7)`;
 }
 
 function setupSlider() {
@@ -333,20 +382,29 @@ function setupSlider() {
     sliderDiv.innerHTML = '';
     const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
     if (!selected.length) return;
-    const firstTagData = tagData[selected[0]] || [];
-    if (firstTagData.length < 2) return;
-    sliderTimestamps = firstTagData.map(d => new Date(d.timestamp).getTime());
-    sliderRange = [0, sliderTimestamps.length - 1];
+    // Use all timestamps from all selected tags
+    let allTimestamps = [];
+    selected.forEach(tagId => {
+        const dataArr = tagData[tagId] || [];
+        allTimestamps = allTimestamps.concat(dataArr.map(d => new Date(d.timestamp).getTime()));
+    });
+    if (allTimestamps.length < 2) return;
+    allTimestamps.sort((a, b) => a - b);
+    const minTs = allTimestamps[0];
+    const maxTs = allTimestamps[allTimestamps.length - 1];
     sliderDiv.innerHTML = '<div id="slider-el"></div>';
     slider = document.getElementById('slider-el');
     noUiSlider.create(slider, {
-        start: sliderRange,
+        start: [minTs, maxTs],
         connect: true,
-        range: { min: 0, max: sliderTimestamps.length - 1 },
-        step: 1,
-        tooltips: [true, true],
+        range: { min: minTs, max: maxTs },
+        step: 1000, // 1 second
+        tooltips: [
+            { to: v => new Date(v).toLocaleString(), from: Number },
+            { to: v => new Date(v).toLocaleString(), from: Number }
+        ],
         format: {
-            to: i => new Date(sliderTimestamps[Math.round(i)]).toLocaleString(),
+            to: v => Math.round(v),
             from: Number
         }
     });
@@ -360,21 +418,18 @@ function setupSlider() {
 function zoomChartToSlider() {
     const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
     if (!slider || !selected.length) return;
-    const firstTagData = tagData[selected[0]] || [];
-    if (firstTagData.length < 2) return;
-    let [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
-    // Clamp indices to valid range
-    startIdx = Math.max(0, Math.min(startIdx, firstTagData.length - 1));
-    endIdx = Math.max(0, Math.min(endIdx, firstTagData.length - 1));
-    if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
-    // For each selected tag, slice the data to the slider range
+    let [startMs, endMs] = slider.noUiSlider.get().map(Number);
+    if (startMs > endMs) [startMs, endMs] = [endMs, startMs];
+    // For each selected tag, filter data to the slider time window
     let allLabels = new Set();
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
-        dataArr.forEach(d => allLabels.add(d.timestamp));
+        dataArr.forEach(d => {
+            const t = new Date(d.timestamp).getTime();
+            if (t >= startMs && t <= endMs) allLabels.add(d.timestamp);
+        });
     });
     const sortedLabels = Array.from(allLabels).sort();
-    const zoomedLabels = sortedLabels.slice(startIdx, endIdx + 1);
     let datasets = [];
     let allAltitudes = [];
     selected.forEach((tagId, idx) => {
@@ -382,16 +437,18 @@ function zoomChartToSlider() {
         const dataArr = tagData[tagId] || [];
         const tsToAlt = {};
         dataArr.forEach(d => { tsToAlt[d.timestamp] = Number(d.altitude_ft); });
-        const altitudes = zoomedLabels.map(ts => tsToAlt.hasOwnProperty(ts) ? tsToAlt[ts] : null);
+        // Only include data within the slider window
+        const altitudes = sortedLabels.map(ts => tsToAlt.hasOwnProperty(ts) ? tsToAlt[ts] : null);
         allAltitudes = allAltitudes.concat(altitudes.filter(a => a !== null));
+        let userColor = localStorage.getItem('tagColor_' + tagId) || color;
         datasets.push({
             label: `Tag ${tagId}`,
             data: altitudes,
-            borderColor: color,
-            backgroundColor: color.replace('0.7','0.15'),
+            borderColor: userColor,
+            backgroundColor: userColor.replace('0.7','0.15'),
             pointRadius: 1,
             fill: true,
-            spanGaps: true,
+            spanGaps: spanGapsEnabled,
         });
     });
     // Dynamic Y-axis scaling
@@ -404,7 +461,7 @@ function zoomChartToSlider() {
     chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: zoomedLabels,
+            labels: sortedLabels,
             datasets: datasets
         },
         options: {
@@ -518,6 +575,10 @@ window.addEventListener('DOMContentLoaded', function() {
             status.style.display = 'inline';
             setTimeout(() => { status.style.display = 'none'; }, 1200);
         });
+    };
+    document.getElementById('span-gaps-toggle').onchange = function() {
+        spanGapsEnabled = this.checked;
+        drawChart();
     };
 });
 

@@ -29,9 +29,22 @@ from dateutil import parser as dateparser
 import sqlite3
 from functools import wraps
 import hashlib
+import logging
+from logging.handlers import RotatingFileHandler
+import shutil
+import psutil
 
 app = Flask(__name__)
 app.secret_key = 'apexshield-atos-tak-forwarder-2024'
+
+# Set up rotating logger at the top
+logger = logging.getLogger('atos_forwarder')
+logger.setLevel(logging.INFO)
+handler = RotatingFileHandler('atos_forwarder.log', maxBytes=1_000_000, backupCount=5)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+handler.setFormatter(formatter)
+if not logger.hasHandlers():
+    logger.addHandler(handler)
 
 # ==== Global Configuration ====
 UNKNOWN_COORD = 9999999.0
@@ -48,9 +61,197 @@ BATCH_SIZE = 50
 SERIAL_BUFFER_SIZE = 8192
 UDP_BATCH_INTERVAL = 0.5  # seconds
 
-# Rate limiting per tag (like ATOS plugin)
-TAG_RATE_LIMIT = 1.0  # 1 second between updates per tag
-tag_last_processed = {}  # Track when each tag was last processed
+# Enhanced performance monitoring
+class PerformanceMonitor:
+    """Enhanced performance monitoring with system health metrics"""
+    def __init__(self):
+        self.start_time = time.time()
+        self.metrics = {
+            'system_uptime': 0,
+            'memory_usage_mb': 0,
+            'cpu_usage_percent': 0,
+            'queue_utilization': 0,
+            'packet_processing_rate': 0,
+            'udp_send_rate': 0,
+            'error_rate': 0,
+            'active_connections': 0,
+            'database_size_mb': 0,
+            'disk_usage_percent': 0,
+            'network_latency_ms': 0,
+            'serial_connection_status': 'disconnected',
+            'tak_server_status': 'disconnected',
+            'multicast_status': 'inactive'
+        }
+        self.history = deque(maxlen=1000)  # Store last 1000 measurements
+        self.last_update = 0
+        
+    def update_metrics(self):
+        """Update all performance metrics"""
+        current_time = time.time()
+        if current_time - self.last_update < 5:  # Update every 5 seconds max
+            return
+            
+        self.last_update = current_time
+        
+        # System metrics
+        self.metrics['system_uptime'] = current_time - self.start_time
+        
+        # Memory usage (simplified for cross-platform)
+        try:
+            process = psutil.Process()
+            self.metrics['memory_usage_mb'] = round(process.memory_info().rss / 1024 / 1024, 2)
+            self.metrics['cpu_usage_percent'] = round(process.cpu_percent(), 2)
+        except ImportError:
+            # Fallback if psutil not available
+            self.metrics['memory_usage_mb'] = 0
+            self.metrics['cpu_usage_percent'] = 0
+        
+        # Queue utilization
+        queue_size = packet_queue.qsize()
+        self.metrics['queue_utilization'] = round((queue_size / MAX_QUEUE_SIZE) * 100, 2)
+        
+        # Processing rates (calculate from stats)
+        if stats['total_packets'] > 0:
+            time_diff = current_time - self.start_time
+            self.metrics['packet_processing_rate'] = round(stats['total_packets'] / time_diff, 2)
+            self.metrics['udp_send_rate'] = round(stats['udp_sends'] / time_diff, 2)
+        
+        # Error rate
+        total_operations = stats['total_packets'] + stats['rate_limited_packets']
+        if total_operations > 0:
+            self.metrics['error_rate'] = round((stats['rate_limited_packets'] / total_operations) * 100, 2)
+        
+        # Connection status
+        self.metrics['active_connections'] = stats['active_tags']
+        self.metrics['serial_connection_status'] = 'connected' if stats['connected'] else 'disconnected'
+        
+        # Database size
+        try:
+            if os.path.exists('atos_events.db'):
+                db_size = os.path.getsize('atos_events.db')
+                self.metrics['database_size_mb'] = round(db_size / 1024 / 1024, 2)
+        except:
+            self.metrics['database_size_mb'] = 0
+        
+        # Disk usage
+        try:
+            if os.path.exists('.'):
+                total, used, free = shutil.disk_usage('.')
+                self.metrics['disk_usage_percent'] = round((used / total) * 100, 2)
+        except:
+            self.metrics['disk_usage_percent'] = 0
+        
+        # Store in history
+        self.history.append({
+            'timestamp': current_time,
+            'metrics': self.metrics.copy()
+        })
+        
+        # Log significant events
+        self._check_alerts()
+    
+    def _check_alerts(self):
+        """Check for performance alerts and log them"""
+        alerts = []
+        
+        if self.metrics['memory_usage_mb'] > 500:  # 500MB threshold
+            alerts.append(f"High memory usage: {self.metrics['memory_usage_mb']}MB")
+            
+        if self.metrics['queue_utilization'] > 80:  # 80% queue utilization
+            alerts.append(f"High queue utilization: {self.metrics['queue_utilization']}%")
+            
+        if self.metrics['error_rate'] > 10:  # 10% error rate
+            alerts.append(f"High error rate: {self.metrics['error_rate']}%")
+            
+        if self.metrics['disk_usage_percent'] > 90:  # 90% disk usage
+            alerts.append(f"High disk usage: {self.metrics['disk_usage_percent']}%")
+        
+        for alert in alerts:
+            logger.warning(f"Performance Alert: {alert}")
+    
+    def get_metrics(self):
+        """Get current metrics"""
+        self.update_metrics()
+        return self.metrics.copy()
+    
+    def get_history(self, minutes=60):
+        """Get historical metrics for the last N minutes"""
+        cutoff_time = time.time() - (minutes * 60)
+        return [entry for entry in self.history if entry['timestamp'] >= cutoff_time]
+    
+    def get_health_score(self):
+        """Calculate overall system health score (0-100)"""
+        self.update_metrics()
+        score = 100
+        
+        # Deduct points for issues
+        if self.metrics['memory_usage_mb'] > 500:
+            score -= 20
+        if self.metrics['queue_utilization'] > 80:
+            score -= 15
+        if self.metrics['error_rate'] > 10:
+            score -= 25
+        if self.metrics['disk_usage_percent'] > 90:
+            score -= 10
+        if not stats['connected']:
+            score -= 30
+            
+        return max(0, score)
+
+# Global performance monitor
+performance_monitor = PerformanceMonitor()
+
+# Unified timing system
+class UnifiedTimingSystem:
+    """Centralized timing system that unifies rate limiting and TDMA delays"""
+    def __init__(self):
+        self.tag_last_processed = {}  # Track last processed time per tag
+        self.tag_last_sent = {}       # Track last sent time per tag
+        self.tdma_cycle_start = 0     # Track TDMA cycle start time
+        self.tdma_interval = 2        # Default TDMA interval
+        
+    def update_tdma_interval(self, interval):
+        """Update the TDMA interval"""
+        self.tdma_interval = max(interval, 1)  # Minimum 1 second
+        
+    def can_process_tag(self, tag_id, current_time):
+        """Check if a tag can be processed (rate limiting)"""
+        last_processed = self.tag_last_processed.get(tag_id, 0)
+        # Use TDMA interval as the rate limit to ensure consistency
+        return (current_time - last_processed) >= self.tdma_interval
+        
+    def can_send_tag(self, tag_id, current_time):
+        """Check if a tag can be sent (TDMA timing)"""
+        last_sent = self.tag_last_sent.get(tag_id, 0)
+        # Ensure minimum spacing between sends
+        min_spacing = max(0.1, self.tdma_interval / 100.0)  # At least 100ms or TDMA-based spacing
+        return (current_time - last_sent) >= min_spacing
+        
+    def mark_tag_processed(self, tag_id, current_time):
+        """Mark a tag as processed"""
+        self.tag_last_processed[tag_id] = current_time
+        
+    def mark_tag_sent(self, tag_id, current_time):
+        """Mark a tag as sent"""
+        self.tag_last_sent[tag_id] = current_time
+        
+    def start_tdma_cycle(self, current_time):
+        """Start a new TDMA cycle"""
+        self.tdma_cycle_start = current_time
+        
+    def get_tdma_cycle_elapsed(self, current_time):
+        """Get elapsed time in current TDMA cycle"""
+        return current_time - self.tdma_cycle_start
+        
+    def should_start_new_cycle(self, current_time):
+        """Check if we should start a new TDMA cycle"""
+        return self.get_tdma_cycle_elapsed(current_time) >= self.tdma_interval
+
+# Global timing system instance
+timing_system = UnifiedTimingSystem()
+
+# ==== Global Variables ====
+# ... existing code ...
 
 # Global data storage
 tag_data = {}
@@ -501,7 +702,7 @@ class OptimizedTAKClient:
 
 # ==== Optimized Worker Threads ====
 def packet_processor():
-    """Process packets from the queue with per-tag rate limiting"""
+    """Process packets from the queue with unified timing"""
     print("🚀 Packet processor thread started")
     while True:
         try:
@@ -515,16 +716,16 @@ def packet_processor():
                     tag_id = result['tag_id']
                     current_time = time.time()
                     
-                    # Check rate limiting per tag (like ATOS plugin)
-                    last_processed = tag_last_processed.get(tag_id, 0)
-                    if current_time - last_processed < TAG_RATE_LIMIT:
+                    # Use unified timing system for rate limiting
+                    if not timing_system.can_process_tag(tag_id, current_time):
                         # Skip this packet - too soon since last update for this tag
                         stats['rate_limited_packets'] += 1
-                        print(f"⏱️ Rate limiting tag {tag_id} - skipping packet (last update was {current_time - last_processed:.2f}s ago)")
+                        time_since_last = current_time - timing_system.tag_last_processed.get(tag_id, 0)
+                        print(f"⏱️ Rate limiting tag {tag_id} - skipping packet (last update was {time_since_last:.2f}s ago)")
                         continue
                     
-                    # Update last processed time for this tag
-                    tag_last_processed[tag_id] = current_time
+                    # Mark tag as processed
+                    timing_system.mark_tag_processed(tag_id, current_time)
                     
                     with TAG_DATA_LOCK:
                         old_data = tag_data.get(tag_id)
@@ -553,27 +754,29 @@ def packet_processor():
             print(f"Error in packet processor: {e}")
 
 def udp_batch_sender():
-    """Send batched UDP messages"""
-    print("🚀 UDP batch sender thread started")
+    """Send a batch of tags via UDP every configured interval"""
+    print("🚀 UDP batch sender started")
     tak_client = OptimizedTAKClient()
-    
     while True:
         try:
-            # Collect pending tags
+            pending = {}
             with TAG_DATA_LOCK:
-                pending = tags_pending_send.copy()
-                tags_pending_send.clear()
-            
-            if not pending:
-                time.sleep(UDP_BATCH_INTERVAL)
-                continue
-            
+                for tag_id, tag in tags_pending_send.items():
+                    pending[tag_id] = tag.copy()
+            # Memoization cache for staleness per cycle
+            staleness_cache = {}
+            def is_stale(tag):
+                key = (id(tag), tag.get('timestamp_epoch', tag.get('timestamp', None)))
+                if key in staleness_cache:
+                    return staleness_cache[key]
+                result = get_tag_staleness(tag)
+                staleness_cache[key] = result
+                return result
             # Prepare batch
             batch_messages = []
             for tag_id, tag in pending.items():
-                if get_tag_staleness(tag):
+                if is_stale(tag):
                     continue
-                    
                 cfg = forwarding_config['tags'].get(str(tag_id), {})
                 should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
                 if not should_forward:
@@ -602,36 +805,62 @@ def udp_batch_sender():
             time.sleep(1)
 
 def tag_scheduler_loop():
-    """Deterministically send tags to TAK server one by one"""
+    """Deterministically send tags to TAK server with unified timing"""
     print("🚀 Tag scheduler loop started")
     tak_client = OptimizedTAKClient()
-
+    
     while True:
         with TAG_DATA_LOCK:
             has_pending = bool(tags_pending_send)
         if not has_pending:
             time.sleep(0.1)
             continue
-
+            
+        # Update TDMA interval from config
         tdma_interval = tak_server_config.get('tdma_interval', 10)
-        per_tag_delay = tdma_interval / 100.0 if tdma_interval >= 3 else 0.03
-        cycle_start = time.time()
+        timing_system.update_tdma_interval(tdma_interval)
+        
+        # Start new TDMA cycle
+        current_time = time.time()
+        timing_system.start_tdma_cycle(current_time)
+        
+        # Memoization cache for staleness per cycle
+        staleness_cache = {}
+        def is_stale(tag):
+            key = (id(tag), tag.get('timestamp_epoch', tag.get('timestamp', None)))
+            if key in staleness_cache:
+                return staleness_cache[key]
+            result = get_tag_staleness(tag)
+            staleness_cache[key] = result
+            return result
+            
+        # Process tags in TDMA order
         for tag_id in range(1, 101):
             with TAG_DATA_LOCK:
                 tag = tags_pending_send.pop(tag_id, None)
-            if tag and not get_tag_staleness(tag):
+                
+            if tag and not is_stale(tag):
                 cfg = forwarding_config['tags'].get(str(tag_id), {})
                 should_forward = cfg.get('forward', forwarding_config.get('forward_all', False))
                 if should_forward:
-                    tag_to_send = tag.copy()
-                    tag_to_send['color'] = cfg.get('color', 'white')
-                    tag_to_send['track_type'] = cfg.get('track_type', 'PAX')
-                    callsign = cfg.get('callsign') or tag_id
-                    tag_to_send['callsign'] = callsign
-                    tak_client.send_batch([(tag_id, tag_to_send, callsign)], send_to_server=True, send_to_multicast=False)
+                    # Check unified timing constraints
+                    current_time = time.time()
+                    if timing_system.can_send_tag(tag_id, current_time):
+                        tag_to_send = tag.copy()
+                        tag_to_send['color'] = cfg.get('color', 'white')
+                        tag_to_send['track_type'] = cfg.get('track_type', 'PAX')
+                        callsign = cfg.get('callsign') or tag_id
+                        tag_to_send['callsign'] = callsign
+                        tak_client.send_batch([(tag_id, tag_to_send, callsign)], send_to_server=True, send_to_multicast=False)
+                        timing_system.mark_tag_sent(tag_id, current_time)
+            
+            # Use TDMA-based delay
+            per_tag_delay = max(0.01, tdma_interval / 100.0)  # Minimum 10ms
             time.sleep(per_tag_delay)
 
-        elapsed = time.time() - cycle_start
+        # Wait for cycle completion
+        current_time = time.time()
+        elapsed = timing_system.get_tdma_cycle_elapsed(current_time)
         if elapsed < tdma_interval:
             time.sleep(tdma_interval - elapsed)
 
@@ -645,19 +874,24 @@ def multicast_batch_loop():
         if tak_server_config.get('disable_multicast', False):
             print("📡 Multicast disabled, skipping...")
             continue
-        
         batch_messages = []
         with TAG_DATA_LOCK:
             tag_items = list(tag_data.items())
-        
         print(f"📡 Preparing multicast batch with {len(tag_items)} total tags")
-        
         stale_count = 0
         not_forwarded_count = 0
         added_count = 0
-        
+        # Memoization cache for staleness per cycle
+        staleness_cache = {}
+        def is_stale(tag):
+            key = (id(tag), tag.get('timestamp_epoch', tag.get('timestamp', None)))
+            if key in staleness_cache:
+                return staleness_cache[key]
+            result = get_tag_staleness(tag)
+            staleness_cache[key] = result
+            return result
         for tag_id, tag in tag_items:
-            if get_tag_staleness(tag):
+            if is_stale(tag):
                 stale_count += 1
                 continue
             cfg = forwarding_config['tags'].get(str(tag_id), {})
@@ -770,16 +1004,25 @@ def api_tags():
     result = {}
     with TAG_DATA_LOCK:
         tag_data_snapshot = tag_data.copy()
+    # Memoization cache for staleness per request
+    staleness_cache = {}
+    def is_stale(tag):
+        key = (id(tag), tag.get('timestamp_epoch', tag.get('timestamp', None)))
+        if key in staleness_cache:
+            return staleness_cache[key]
+        result = get_tag_staleness(tag)
+        staleness_cache[key] = result
+        return result
     for i in range(1, 101):
         tag_id = str(i)
         tag_key = int(tag_id)
         if tag_key in tag_data_snapshot:
             t = tag_data_snapshot[tag_key].copy()
-            t['stale'] = get_tag_staleness(t)
+            t['stale'] = is_stale(t)
         else:
             t = {'stale': True, 'bad_gps': True}
         cfg = forwarding_config['tags'].get(tag_id, {})
-        t['forward'] = cfg.get('forward', forwarding_config.get('forward_all', False))
+        t['forward'] = bool(cfg.get('forward', forwarding_config.get('forward_all', False)))
         callsign = cfg.get('callsign')
         if not callsign:
             callsign = str(tag_id)
@@ -792,17 +1035,41 @@ def api_tags():
 @app.route('/api/stats')
 def api_stats():
     # Update active tags count
-    stats['active_tags'] = len(tag_last_processed)
+    stats['active_tags'] = len(timing_system.tag_last_processed)
     
     return jsonify({
         'stats': stats,
         'queue_size': packet_queue.qsize(),
         'pending_tags': len(tags_pending_send),
         'rate_limiting': {
-            'tag_rate_limit_seconds': TAG_RATE_LIMIT,
-            'active_tags': len(tag_last_processed),
-            'rate_limited_packets': stats.get('rate_limited_packets', 0)
+            'tag_rate_limit_seconds': timing_system.tdma_interval,
+            'active_tags': len(timing_system.tag_last_processed),
+            'rate_limited_packets': stats.get('rate_limited_packets', 0),
+            'tdma_interval': timing_system.tdma_interval
         }
+    })
+
+@app.route('/api/performance')
+def api_performance():
+    """Get detailed performance metrics"""
+    metrics = performance_monitor.get_metrics()
+    health_score = performance_monitor.get_health_score()
+    
+    return jsonify({
+        'metrics': metrics,
+        'health_score': health_score,
+        'status': 'healthy' if health_score >= 80 else 'warning' if health_score >= 50 else 'critical'
+    })
+
+@app.route('/api/performance/history')
+def api_performance_history():
+    """Get historical performance data"""
+    minutes = request.args.get('minutes', 60, type=int)
+    history = performance_monitor.get_history(minutes)
+    
+    return jsonify({
+        'history': history,
+        'duration_minutes': minutes
     })
 
 @app.route('/api/tak_server', methods=['GET', 'POST'])
@@ -825,7 +1092,10 @@ def api_tak_server():
             pass
     if 'tdma_interval' in data:
         try:
-            tak_server_config['tdma_interval'] = int(data.get('tdma_interval'))
+            new_tdma_interval = int(data.get('tdma_interval'))
+            tak_server_config['tdma_interval'] = new_tdma_interval
+            # Update the unified timing system
+            timing_system.update_tdma_interval(new_tdma_interval)
         except (TypeError, ValueError):
             pass
     if 'multicast_interval' in data:
@@ -933,9 +1203,18 @@ def get_data():
     tags_with_stale = {}
     with TAG_DATA_LOCK:
         tag_items = list(tag_data.items())
+    # Memoization cache for staleness per request
+    staleness_cache = {}
+    def is_stale(tag):
+        key = (id(tag), tag.get('timestamp_epoch', tag.get('timestamp', None)))
+        if key in staleness_cache:
+            return staleness_cache[key]
+        result = get_tag_staleness(tag)
+        staleness_cache[key] = result
+        return result
     for tag_id, tag in tag_items:
         tag_copy = tag.copy()
-        tag_copy['stale'] = get_tag_staleness(tag_copy)
+        tag_copy['stale'] = is_stale(tag_copy)
         tags_with_stale[tag_id] = tag_copy
     return jsonify({
         'tags': tags_with_stale,
@@ -967,18 +1246,37 @@ def api_db_tags():
 def api_db_tag_data():
     import sys
     from flask import current_app
+    from datetime import datetime, timezone
+    import re
     # Query: ?tag_id=1,2,3&start=...&end=...&minutes=...
     try:
         tag_id_param = request.args.get('tag_id')
         if tag_id_param is None:
             return jsonify({'error': 'tag_id parameter is required'}), 400
         tag_ids = [int(tid) for tid in tag_id_param.split(',') if tid.strip().isdigit()]
+        # Validate tag IDs
+        for tid in tag_ids:
+            if tid < 1 or tid > 100:
+                return jsonify({'error': f'Invalid tag_id: {tid}. Must be 1-100.'}), 400
         if not tag_ids:
             return jsonify({'error': 'No valid tag IDs provided'}), 400
+        # Validate timestamps if present
+        def is_iso8601(ts):
+            try:
+                datetime.fromisoformat(ts.replace('Z','').replace(' ','T'))
+                return True
+            except Exception:
+                return False
+        start = request.args.get('start')
+        end = request.args.get('end')
+        if start and not is_iso8601(start):
+            return jsonify({'error': f'Invalid start timestamp: {start}'}), 400
+        if end and not is_iso8601(end):
+            return jsonify({'error': f'Invalid end timestamp: {end}'}), 400
         minutes = request.args.get('minutes')
         result = {}
         for tag_id in tag_ids:
-            start = None
+            tag_start = None
             if minutes:
                 try:
                     minutes_int = int(minutes)
@@ -989,30 +1287,45 @@ def api_db_tag_data():
                     if latest_ts:
                         latest_dt = dateparser.parse(latest_ts)
                         start_dt = latest_dt - timedelta(minutes=minutes_int)
-                        start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
+                        tag_start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
                 except Exception as e:
-                    print(f"[ERROR] Minutes calculation: {e}", file=sys.stderr)
-                    start = None
+                    logger.error(f"Minutes calculation: {e}")
+                    tag_start = None
             q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
-            params = [tag_id]
+            params = [int(tag_id)]
+            if tag_start is not None and tag_start != '':
+                q += ' AND timestamp >= ?'
+                params.append(str(tag_start))
             if start is not None and start != '':
                 q += ' AND timestamp >= ?'
-                params.append(start)
+                params.append(str(start))
+            if end is not None and end != '':
+                q += ' AND timestamp <= ?'
+                params.append(str(end))
             q += ' ORDER BY timestamp'
             with atos_sqlite.get_db() as conn:
                 rows = conn.execute(q, params).fetchall()
                 data = []
                 for row in rows:
                     alt_ft = row['altitude_ft']
+                    if alt_ft is not None:
+                        alt_ft = round(alt_ft, 1)
                     ts = row['timestamp']
-                    if ts and not ts.endswith('Z'):
-                        ts = ts.replace(' ', 'T') + 'Z'
+                    # Ensure millisecond UTC ISO format
+                    if ts:
+                        try:
+                            dt = datetime.fromisoformat(ts.replace('Z','').replace(' ','T'))
+                            dt = dt.replace(tzinfo=timezone.utc)
+                            ts = dt.isoformat(timespec='milliseconds').replace('+00:00','Z')
+                        except Exception:
+                            if not ts.endswith('Z'):
+                                ts = ts.replace(' ', 'T') + 'Z'
                     data.append({'timestamp': ts, 'altitude_ft': alt_ft})
                 result[tag_id] = data
         return jsonify(result)
     except Exception as e:
         import traceback
-        print(f"[ERROR] /api/db/tag_data: {e}", file=sys.stderr)
+        logger.error(f"/api/db/tag_data: {e}")
         traceback.print_exc()
         return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
@@ -1025,17 +1338,29 @@ def api_db_export_csv():
     start = request.args.get('start')
     end = request.args.get('end')
     dz_altitude = request.args.get('dz_altitude', type=float)
+    sample_1hz = request.args.get('sample_1hz', 'false').lower() == 'true'
     q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
     params = [tag_id]
-    if start:
+    if start is not None and start != '':
         q += ' AND timestamp >= ?'
-        params.append(start)
-    if end:
+        params.append(str(start))
+    if end is not None and end != '':
         q += ' AND timestamp <= ?'
-        params.append(end)
+        params.append(str(end))
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
+    # Sample at 1Hz if requested
+    if sample_1hz:
+        filtered = []
+        last_sec = None
+        for row in rows:
+            ts = row['timestamp']
+            sec = ts[:19]  # 'YYYY-MM-DDTHH:MM:SS'
+            if sec != last_sec:
+                filtered.append(row)
+                last_sec = sec
+        rows = filtered
     output = io.StringIO()
     writer = csv.writer(output)
     if dz_altitude is not None:
@@ -1065,6 +1390,7 @@ def api_db_export_kml():
     start = request.args.get('start')
     end = request.args.get('end')
     dz_altitude = request.args.get('dz_altitude', type=float)
+    sample_1hz = request.args.get('sample_1hz', 'false').lower() == 'true'
     selected_color = request.args.get('color', 'ff0000ff')  # Default to red if no color specified
     
     # Color palette matching the dropdown (Google Earth KML format: aabbggrr)
@@ -1123,23 +1449,31 @@ def api_db_export_kml():
     kml_placemarks = []
     with atos_sqlite.get_db() as conn:
         for idx, tag_id in enumerate(tag_ids):
-            # For single tag export, use the selected color from dropdown
-            # For multiple tag export, use unique colors from the palette
             if len(tag_ids) == 1:
                 color = selected_color
             else:
                 color = colors[idx % len(colors)]
-            # Query tag data
             q = 'SELECT longitude, latitude, altitude_ft, timestamp FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL'
-            params = [tag_id]
+            params = [int(tag_id)]
             if start is not None and start != '':
                 q += ' AND timestamp >= ?'
-                params.append(start)
+                params.append(str(start))
             if end is not None and end != '':
                 q += ' AND timestamp <= ?'
-                params.append(end)
+                params.append(str(end))
             q += ' ORDER BY timestamp'
             rows = conn.execute(q, params).fetchall()
+            # Sample at 1Hz if requested
+            if sample_1hz:
+                filtered = []
+                last_sec = None
+                for row in rows:
+                    ts = row['timestamp']
+                    sec = ts[:19]
+                    if sec != last_sec:
+                        filtered.append(row)
+                        last_sec = sec
+                rows = filtered
             # Build <when> and <gx:coord> lists
             whens = []
             gx_coords = []
@@ -1355,90 +1689,6 @@ def api_admin_download_archive(filename):
         print(f"[ADMIN] Error downloading archive: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/admin/load_archive', methods=['POST'])
-@admin_required
-def api_admin_load_archive():
-    try:
-        data = request.get_json()
-        filename = data.get('filename')
-        action = data.get('action', 'merge')  # merge, overwrite
-        
-        if not filename:
-            return jsonify({'error': 'Filename is required'}), 400
-        
-        archive_dir = Path('database_archives')
-        archive_path = archive_dir / filename
-        db_path = atos_sqlite.get_db_path()
-        
-        if not archive_path.exists():
-            return jsonify({'error': 'Archive file not found'}), 404
-        
-        if action == 'overwrite':
-            # Backup current database first
-            backup_filename = f'atos_tak_db_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.db'
-            backup_path = archive_dir / backup_filename
-            import shutil
-            shutil.copy2(db_path, backup_path)
-            
-            # Overwrite current database
-            shutil.copy2(archive_path, db_path)
-            print(f"[ADMIN] Database overwritten with {filename}, backup saved as {backup_filename}")
-            return jsonify({'message': f'Database overwritten with {filename}. Backup saved as {backup_filename}'})
-        
-        elif action == 'merge':
-            # Merge archive into current database
-            import sqlite3
-            with sqlite3.connect(archive_path) as archive_conn:
-                archive_conn.row_factory = sqlite3.Row
-                with atos_sqlite.get_db() as current_conn:
-                    # Get all records from archive
-                    archive_records = archive_conn.execute('SELECT * FROM tag_events').fetchall()
-                    
-                    # Insert records that don't already exist (based on timestamp and tag_id)
-                    merged_count = 0
-                    for record in archive_records:
-                        # Check if record already exists
-                        existing = current_conn.execute(
-                            'SELECT 1 FROM tag_events WHERE tag_id = ? AND timestamp = ?',
-                            (record['tag_id'], record['timestamp'])
-                        ).fetchone()
-                        
-                        if not existing:
-                            current_conn.execute(
-                                'INSERT INTO tag_events (tag_id, latitude, longitude, altitude_ft, timestamp, voltage, is_fresh) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                                (record['tag_id'], record['latitude'], record['longitude'], record['altitude_ft'], record['timestamp'], record['voltage'], record['is_fresh'])
-                            )
-                            merged_count += 1
-                    
-                    current_conn.commit()
-            
-            print(f"[ADMIN] Merged {merged_count} records from {filename}")
-            return jsonify({'message': f'Merged {merged_count} records from {filename}'})
-        
-        else:
-            return jsonify({'error': 'Invalid action. Use "merge" or "overwrite"'}), 400
-            
-    except Exception as e:
-        print(f"[ADMIN] Error loading archive: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/delete_archive/<filename>', methods=['DELETE'])
-@admin_required
-def api_admin_delete_archive(filename):
-    try:
-        archive_dir = Path('database_archives')
-        archive_path = archive_dir / filename
-        
-        if not archive_path.exists():
-            return jsonify({'error': 'Archive file not found'}), 404
-        
-        archive_path.unlink()
-        print(f"[ADMIN] Archive deleted: {filename}")
-        return jsonify({'message': f'Archive {filename} deleted successfully'})
-    except Exception as e:
-        print(f"[ADMIN] Error deleting archive: {e}")
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/view_kml')
 def view_kml():
     # Just render the template; JS will read query params from the URL
@@ -1460,6 +1710,142 @@ def set_dz_altitude():
     cfg['dz_altitude'] = dz
     save_tak_config(cfg)
     return {'dz_altitude': dz}
+
+@app.route('/logs')
+def logs_page():
+    """Log viewer page"""
+    return render_template('logs.html')
+
+@app.route('/performance')
+def performance_page():
+    """Performance monitoring page"""
+    return render_template('performance.html')
+
+@app.route('/api/logs')
+def api_logs():
+    """Get log entries with filtering"""
+    try:
+        # Get query parameters
+        severity = request.args.get('severity', '').upper()  # ERROR, WARNING, INFO, or empty for all
+        lines = min(int(request.args.get('lines', 100)), 1000)  # Max 1000 lines
+        log_file = request.args.get('file', 'atos_forwarder.log')  # Default to main log
+        
+        # Validate log file name for security
+        allowed_files = ['atos_forwarder.log', 'atos_forwarder.log.1', 'atos_forwarder.log.2', 
+                        'atos_forwarder.log.3', 'atos_forwarder.log.4', 'atos_forwarder.log.5']
+        if log_file not in allowed_files:
+            return jsonify({'error': 'Invalid log file'}), 400
+            
+        # Read log file
+        log_entries = []
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                # Read last N lines
+                all_lines = f.readlines()
+                recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+                
+                for line in recent_lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    # Parse log entry (format: timestamp level message)
+                    parts = line.split(' ', 2)
+                    if len(parts) >= 3:
+                        timestamp, level, message = parts[0] + ' ' + parts[1], parts[2], parts[3] if len(parts) > 3 else ''
+                        
+                        # Apply severity filter
+                        if severity and level != severity:
+                            continue
+                            
+                        log_entries.append({
+                            'timestamp': timestamp,
+                            'level': level,
+                            'message': message,
+                            'raw': line
+                        })
+                    else:
+                        # Unparseable line, include as-is
+                        log_entries.append({
+                            'timestamp': '',
+                            'level': 'UNKNOWN',
+                            'message': line,
+                            'raw': line
+                        })
+                        
+        except FileNotFoundError:
+            log_entries = [{'timestamp': '', 'level': 'INFO', 'message': f'Log file {log_file} not found', 'raw': ''}]
+        except Exception as e:
+            log_entries = [{'timestamp': '', 'level': 'ERROR', 'message': f'Error reading log file: {e}', 'raw': ''}]
+            
+        # Get available log files
+        available_files = []
+        for file in allowed_files:
+            if os.path.exists(file):
+                try:
+                    size = os.path.getsize(file)
+                    modified = datetime.fromtimestamp(os.path.getmtime(file)).isoformat()
+                    available_files.append({
+                        'name': file,
+                        'size': size,
+                        'modified': modified
+                    })
+                except Exception:
+                    pass
+                    
+        return jsonify({
+            'entries': log_entries,
+            'available_files': available_files,
+            'current_file': log_file,
+            'total_entries': len(log_entries)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Error fetching logs: {e}'}), 500
+
+@app.route('/api/logs/clear')
+@admin_required
+def api_clear_logs():
+    """Clear the current log file (admin only)"""
+    try:
+        log_file = request.args.get('file', 'atos_forwarder.log')
+        
+        # Validate log file name for security
+        allowed_files = ['atos_forwarder.log', 'atos_forwarder.log.1', 'atos_forwarder.log.2', 
+                        'atos_forwarder.log.3', 'atos_forwarder.log.4', 'atos_forwarder.log.5']
+        if log_file not in allowed_files:
+            return jsonify({'error': 'Invalid log file'}), 400
+            
+        # Clear the log file
+        with open(log_file, 'w') as f:
+            f.write('')
+            
+        logger.info(f"Log file {log_file} cleared by admin")
+        return jsonify({'message': f'Log file {log_file} cleared successfully'})
+        
+    except Exception as e:
+        return jsonify({'error': f'Error clearing log file: {e}'}), 500
+
+@app.route('/api/logs/download')
+@admin_required
+def api_download_logs():
+    """Download log file (admin only)"""
+    try:
+        log_file = request.args.get('file', 'atos_forwarder.log')
+        
+        # Validate log file name for security
+        allowed_files = ['atos_forwarder.log', 'atos_forwarder.log.1', 'atos_forwarder.log.2', 
+                        'atos_forwarder.log.3', 'atos_forwarder.log.4', 'atos_forwarder.log.5']
+        if log_file not in allowed_files:
+            return jsonify({'error': 'Invalid log file'}), 400
+            
+        if not os.path.exists(log_file):
+            return jsonify({'error': 'Log file not found'}), 404
+            
+        return send_file(log_file, as_attachment=True, download_name=log_file)
+        
+    except Exception as e:
+        return jsonify({'error': f'Error downloading log file: {e}'}), 500
 
 # Protect all admin API endpoints
 def protect_admin_api():

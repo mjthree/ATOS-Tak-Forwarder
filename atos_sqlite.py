@@ -38,9 +38,14 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+def ensure_latest_index():
+    with get_db() as conn:
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_tag_latest ON tag_events(tag_id, timestamp DESC);')
+
 def init_db():
     with get_db() as conn:
         conn.executescript(SCHEMA)
+    ensure_latest_index()
 
 def insert_tag_event(**kwargs):
     # Only store data for tags 1-100
@@ -49,28 +54,52 @@ def insert_tag_event(**kwargs):
         return  # Skip invalid tag IDs
     timestamp = kwargs.get('timestamp')
     if not timestamp:
-        timestamp = datetime.now().replace(microsecond=0).isoformat()
+        timestamp = datetime.utcnow().replace(microsecond=int(datetime.utcnow().microsecond/1000)*1000).isoformat(timespec='milliseconds') + 'Z'
     else:
-        # Truncate to second precision
         try:
-            ts = datetime.fromisoformat(timestamp)
-            timestamp = ts.replace(microsecond=0).isoformat()
+            ts = datetime.fromisoformat(timestamp.replace('Z','').replace(' ','T'))
+            ts = ts.replace(microsecond=int(ts.microsecond/1000)*1000)
+            timestamp = ts.isoformat(timespec='milliseconds') + 'Z'
         except Exception:
             pass
-    # Round altitude_ft to one decimal place if present
-    altitude_ft = kwargs.get('altitude_ft')
-    if altitude_ft is not None:
-        try:
-            altitude_ft = round(float(altitude_ft), 1)
-        except Exception:
-            pass
+    # Strict type validation/coercion
+    def safe_float(val):
+        return float(val) if val not in (None, "") else None
+    def safe_int(val):
+        return int(val) if val not in (None, "") else None
+    def safe_str(val):
+        return str(val) if val not in (None, "") else None
+    try:
+        alt_val = safe_float(kwargs.get('altitude_ft'))
+        values = {
+            'timestamp': timestamp,
+            'tag_id': safe_int(tag_id),
+            'latitude': safe_float(kwargs.get('latitude')),
+            'longitude': safe_float(kwargs.get('longitude')),
+            'altitude_ft': round(alt_val, 1) if alt_val is not None else None,
+            'battery_voltage': safe_float(kwargs.get('battery_voltage')),
+            'temperature': safe_float(kwargs.get('temperature')),
+            'pdop': safe_float(kwargs.get('pdop')),
+            'wire_status': safe_str(kwargs.get('wire_status')),
+            'object_status': safe_str(kwargs.get('object_status')),
+            'emergency': safe_int(kwargs.get('emergency')),
+            'is_fresh': safe_int(kwargs.get('is_fresh')),
+            'bad_gps': safe_int(kwargs.get('bad_gps')),
+            'tak_ip': safe_str(kwargs.get('tak_ip')),
+            'tak_port': safe_int(kwargs.get('tak_port')),
+            'cot_xml': safe_str(kwargs.get('cot_xml')),
+            'event_type': safe_str(kwargs.get('event_type')),
+        }
+    except Exception as e:
+        print(f"[ERROR] insert_tag_event: type validation failed: {e}")
+        return  # Skip this record
     # Throttle: only write if at least 1 second since last write for this tag
     with _last_write_lock:
         last = _last_write_times.get(tag_id)
         try:
-            ts = datetime.fromisoformat(timestamp)
+            ts = datetime.fromisoformat(timestamp.replace('Z','').replace(' ','T'))
         except Exception:
-            ts = datetime.now()
+            ts = datetime.utcnow()
         if last and (ts - last).total_seconds() < 1.0:
             return  # Skip this write
         _last_write_times[tag_id] = ts
@@ -78,16 +107,12 @@ def insert_tag_event(**kwargs):
         'timestamp','tag_id','latitude','longitude','altitude_ft','battery_voltage','temperature','pdop',
         'wire_status','object_status','emergency','is_fresh','bad_gps','tak_ip','tak_port','cot_xml','event_type'
     ]
-    values = [
-        timestamp if f == 'timestamp' else
-        altitude_ft if f == 'altitude_ft' else
-        kwargs.get(f) for f in fields
-    ]
+    insert_values = [values[f] for f in fields]
     with get_db() as conn:
         conn.execute(f"""
             INSERT INTO tag_events ({','.join(fields)})
             VALUES ({','.join(['?']*len(fields))})
-        """, values)
+        """, insert_values)
 
 def get_db_path():
     return str(DB_PATH) 

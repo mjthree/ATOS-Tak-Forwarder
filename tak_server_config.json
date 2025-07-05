@@ -3,7 +3,7 @@
   "port": 8686,
   "send_interval": 10,
   "multicast_port": 6969,
-  "tdma_interval": 2,
+  "tdma_interval": 5,
   "multicast_interval": 2,
   "disable_multicast": false
 }
