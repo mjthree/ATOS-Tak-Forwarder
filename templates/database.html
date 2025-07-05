@@ -313,7 +313,7 @@ function drawChart() {
                 legend: { display: false },
             },
             scales: {
-                x: { type: 'time', time: { unit: 'minute' }, title: { display: true, text: 'Time' } },
+                x: { type: 'time', time: { unit: 'second' }, title: { display: true, text: 'Time' } },
                 y: { title: { display: true, text: 'Altitude (ft)' }, min: yMin, max: yMax }
             }
         }
@@ -418,7 +418,7 @@ function zoomChartToSlider() {
                 legend: { display: false },
             },
             scales: {
-                x: { type: 'time', time: { unit: 'minute' }, title: { display: true, text: 'Time' } },
+                x: { type: 'time', time: { unit: 'second' }, title: { display: true, text: 'Time' } },
                 y: { title: { display: true, text: 'Altitude (ft)' }, min: yMin, max: yMax }
             }
         }
