@@ -261,16 +261,23 @@ function drawChart() {
     if (chart) { chart.destroy(); chart = null; }
     const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
     if (!selected.length) return;
-    let datasets = [];
     let allLabels = new Set();
+    selected.forEach(tagId => {
+        const dataArr = tagData[tagId] || [];
+        dataArr.forEach(d => allLabels.add(d.timestamp));
+    });
+    const sortedLabels = Array.from(allLabels).sort();
+    let datasets = [];
     let allAltitudes = [];
     selected.forEach((tagId, idx) => {
         const color = TAG_COLORS[idx % TAG_COLORS.length].color;
         const dataArr = tagData[tagId] || [];
-        const labels = dataArr.map(d => d.timestamp);
-        labels.forEach(l => allLabels.add(l));
-        const altitudes = dataArr.map(d => Number(d.altitude_ft));
-        allAltitudes = allAltitudes.concat(altitudes);
+        // Map timestamps to altitudes for this tag
+        const tsToAlt = {};
+        dataArr.forEach(d => { tsToAlt[d.timestamp] = Number(d.altitude_ft); });
+        // Align data to master label list
+        const altitudes = sortedLabels.map(ts => tsToAlt.hasOwnProperty(ts) ? tsToAlt[ts] : null);
+        allAltitudes = allAltitudes.concat(altitudes.filter(a => a !== null));
         datasets.push({
             label: `Tag ${tagId}`,
             data: altitudes,
@@ -281,7 +288,6 @@ function drawChart() {
             spanGaps: true,
         });
     });
-    const sortedLabels = Array.from(allLabels).sort();
     // Dynamic Y-axis scaling
     let yMin = Math.min(...allAltitudes);
     let yMax = Math.max(...allAltitudes);
@@ -358,23 +364,23 @@ function zoomChartToSlider() {
     startIdx = Math.max(0, Math.min(startIdx, firstTagData.length - 1));
     endIdx = Math.max(0, Math.min(endIdx, firstTagData.length - 1));
     if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
-    // If slider is at full range, show all data
-    if (startIdx === 0 && endIdx === firstTagData.length - 1) {
-        drawChart();
-        return;
-    }
     // For each selected tag, slice the data to the slider range
-    let datasets = [];
     let allLabels = new Set();
+    selected.forEach(tagId => {
+        const dataArr = tagData[tagId] || [];
+        dataArr.forEach(d => allLabels.add(d.timestamp));
+    });
+    const sortedLabels = Array.from(allLabels).sort();
+    const zoomedLabels = sortedLabels.slice(startIdx, endIdx + 1);
+    let datasets = [];
     let allAltitudes = [];
     selected.forEach((tagId, idx) => {
         const color = TAG_COLORS[idx % TAG_COLORS.length].color;
         const dataArr = tagData[tagId] || [];
-        const zoomedData = dataArr.slice(startIdx, endIdx + 1);
-        const labels = zoomedData.map(d => d.timestamp);
-        labels.forEach(l => allLabels.add(l));
-        const altitudes = zoomedData.map(d => Number(d.altitude_ft));
-        allAltitudes = allAltitudes.concat(altitudes);
+        const tsToAlt = {};
+        dataArr.forEach(d => { tsToAlt[d.timestamp] = Number(d.altitude_ft); });
+        const altitudes = zoomedLabels.map(ts => tsToAlt.hasOwnProperty(ts) ? tsToAlt[ts] : null);
+        allAltitudes = allAltitudes.concat(altitudes.filter(a => a !== null));
         datasets.push({
             label: `Tag ${tagId}`,
             data: altitudes,
@@ -385,7 +391,6 @@ function zoomChartToSlider() {
             spanGaps: true,
         });
     });
-    const sortedLabels = Array.from(allLabels).sort();
     // Dynamic Y-axis scaling
     let yMin = Math.min(...allAltitudes);
     let yMax = Math.max(...allAltitudes);
@@ -396,7 +401,7 @@ function zoomChartToSlider() {
     chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: sortedLabels,
+            labels: zoomedLabels,
             datasets: datasets
         },
         options: {
