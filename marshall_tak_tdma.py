@@ -989,7 +989,7 @@ def api_db_tag_data():
                     start = start_dt.strftime('%Y-%m-%dT%H:%M:%S')
             except Exception as e:
                 start = None
-        q = 'SELECT timestamp, altitude_ft FROM tag_events WHERE tag_id=? AND altitude_ft IS NOT NULL'
+        q = 'SELECT timestamp, altitude_ft, altitude FROM tag_events WHERE tag_id=? AND (altitude_ft IS NOT NULL OR altitude IS NOT NULL)'
         params = [tag_id]
         if start is not None and start != '':
             q += ' AND timestamp >= ?'
@@ -997,7 +997,17 @@ def api_db_tag_data():
         q += ' ORDER BY timestamp'
         with atos_sqlite.get_db() as conn:
             rows = conn.execute(q, params).fetchall()
-            data = [{'timestamp': row['timestamp'], 'altitude_ft': row['altitude_ft']} for row in rows]
+            data = []
+            for row in rows:
+                # Use altitude_ft if present, else convert altitude (meters) to feet
+                alt_ft = row['altitude_ft']
+                if alt_ft is None and row['altitude'] is not None:
+                    alt_ft = round(row['altitude'] * 3.28084, 1)
+                # Normalize timestamp to ISO 8601 with Z
+                ts = row['timestamp']
+                if ts and not ts.endswith('Z'):
+                    ts = ts.replace(' ', 'T') + 'Z'
+                data.append({'timestamp': ts, 'altitude_ft': alt_ft})
         result[tag_id] = data
     return jsonify(result)
 
