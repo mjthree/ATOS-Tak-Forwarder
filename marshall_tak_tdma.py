@@ -1055,8 +1055,10 @@ def api_db_export_kml():
     end = request.args.get('end')
     dz_altitude = request.args.get('dz_altitude', type=float)
     selected_color = request.args.get('color', 'ff0000ff')  # Default to red if no color specified
+    print(f"[DEBUG] KML Export - Selected color: {selected_color}, Tag IDs: {tag_ids}")
     
-    # Predefined color palette (Google Earth KML format: aabbggrr)
+    # Expanded color palette (Google Earth KML format: aabbggrr)
+    # Each color is designed to be visually distinct from others
     colors = [
         'ff0000ff', # Red
         'ff00ff00', # Green
@@ -1064,8 +1066,6 @@ def api_db_export_kml():
         'ff00ffff', # Yellow
         'ffff00ff', # Magenta
         'ffffff00', # Cyan
-        'ff000000', # Black
-        'ffffffff', # White
         'ff964b00', # Brown
         'ff800080', # Purple
         'ff008080', # Teal
@@ -1073,16 +1073,57 @@ def api_db_export_kml():
         'ff00aaff', # Orange
         'ff00ffaa', # Spring Green
         'ffaa00ff', # Pink
+        'ff4b0082', # Indigo
+        'ff8b4513', # Saddle Brown
+        'ff32cd32', # Lime Green
+        'ffda70d6', # Orchid
+        'ff4169e1', # Royal Blue
+        'ffdc143c', # Crimson
+        'ffff6347', # Tomato
+        'ff20b2aa', # Light Sea Green
+        'ffff69b4', # Hot Pink
+        'ffdda0dd', # Plum
+        'ff90ee90', # Light Green
+        'ff87ceeb', # Sky Blue
+        'ffd2691e', # Chocolate
+        'ffba55d3', # Medium Orchid
+        'ff228b22', # Forest Green
+        'ffb8860b', # Dark Goldenrod
+        'ffcd853f', # Peru
+        'ff9932cc', # Dark Orchid
+        'ff8fbc8f', # Dark Sea Green
+        'ffb03060', # Maroon
+        'ff2e8b57', # Sea Green
+        'ffdaa520', # Goldenrod
+        'ffcd5c5c', # Indian Red
+        'ff4b0082', # Indigo
+        'ff556b2f', # Dark Olive Green
+        'ff8b008b', # Dark Magenta
+        'ff2f4f4f', # Dark Slate Gray
+        'ffb22222', # Fire Brick
+        'ff006400', # Dark Green
+        'ff8b0000', # Dark Red
+        'ff000080', # Navy
+        'ff808000', # Olive
+        'ff800000', # Maroon
+        'ff008000', # Green
+        'ff000080', # Navy
+        'ff800080', # Purple
+        'ff008080', # Teal
+        'ff000000', # Black
     ]
     kml_styles = []
     kml_placemarks = []
     with atos_sqlite.get_db() as conn:
         for idx, tag_id in enumerate(tag_ids):
-            # Use selected color for single tag, or cycle through colors for multiple tags
+            # For single tag export, use the selected color from dropdown
+            # For multiple tag export, use unique colors from the palette
             if len(tag_ids) == 1:
                 color = selected_color
             else:
+                # Ensure each tag gets a unique color, cycling through the palette if needed
                 color = colors[idx % len(colors)]
+            print(f"[DEBUG] Tag {tag_id} using color: {color}")
             style_id = f"lineStyle{tag_id}"
             kml_styles.append(f"""
     <Style id="{style_id}">
