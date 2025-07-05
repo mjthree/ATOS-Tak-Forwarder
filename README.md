@@ -58,6 +58,7 @@ The ATOS TAK Forwarder is a production-ready, high-performance system designed f
 - **Database Archival**: Automatic data management and cleanup
 - **Security**: Authentication, authorization, and network security
 - **Backup & Recovery**: Automated backup and disaster recovery
+- **Time Zone Consistency**: All exported data and UI displays use the America/Phoenix timezone (MST). The backend converts UTC timestamps before sending them.
 
 ### 🌐 Integration
 - **TAK Server**: Native UDP communication
