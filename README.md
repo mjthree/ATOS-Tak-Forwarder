@@ -54,11 +54,13 @@ The ATOS TAK Forwarder is a production-ready, high-performance system designed f
 
 ### 🔧 Advanced Features
 - **Template System**: Save and load configuration templates
-- **Export Capabilities**: CSV and KML data export
+- **Export Capabilities**: CSV and KML data export with altitude mode options
+- **KML Altitude Modes**: Choose between "Ground Track" (clamped to ground) and "3D Track" (absolute altitude)
 - **Database Archival**: Automatic data management and cleanup
 - **Security**: Authentication, authorization, and network security
 - **Backup & Recovery**: Automated backup and disaster recovery
 - **Time Zone Consistency**: All exported data and UI displays use the America/Phoenix timezone (MST). The backend converts UTC timestamps before sending them.
+- **CSV Simulation**: Import and convert CSV flight data for testing and simulation
 
 ### 🌐 Integration
 - **TAK Server**: Native UDP communication
@@ -241,9 +243,17 @@ LOG_LEVEL=INFO
 ### Web Interface
 1. **Main Dashboard**: Configure tags, forwarding, and system settings
 2. **Display Dashboard**: Real-time map visualization and tracking
-3. **Database Interface**: View historical data and export
+3. **Database Interface**: View historical data and export with KML altitude mode options
 4. **Performance Monitor**: System health and metrics
 5. **Log Viewer**: Real-time log monitoring and management
+
+### Data Export Features
+- **CSV Export**: Historical data export with timestamp conversion to MST
+- **KML Export**: Google Earth compatible files with altitude mode selection:
+  - **Ground Track**: Tracks clamped to ground surface (default)
+  - **3D Track**: Full 3D altitude visualization
+- **Map Integration**: Direct KML viewing in web browser
+- **DZ Altitude**: Configurable drop zone altitude for AGL calculations
 
 ### API Usage
 ```bash
@@ -413,7 +423,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Version**: 2.0  
-**Last Updated**: December 2024  
+**Version**: 2.1  
+**Last Updated**: January 2025  
 **Compatibility**: ATOS TAK Forwarder v2.0+  
 **Status**: Production Ready
