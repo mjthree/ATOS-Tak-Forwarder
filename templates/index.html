@@ -141,14 +141,19 @@ function formatMSTTimeOnly(utcTimestamp) {
   // Convert to MST (America/Phoenix)
   try {
     // Use Intl.DateTimeFormat for time zone conversion
-    const options = { hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'America/Phoenix' };
+    const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Phoenix' };
     const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);
-    const hour = parts.find(p => p.type === 'hour').value;
-    const minute = parts.find(p => p.type === 'minute').value;
-    return `${hour}:${minute}`;
+    const hour = parts.find(p => p.type === 'hour')?.value || '00';
+    const minute = parts.find(p => p.type === 'minute')?.value || '00';
+    const second = parts.find(p => p.type === 'second')?.value || '00';
+    return `${hour}:${minute}:${second}`;
   } catch (e) {
-    // Fallback: just show hour:minute in local time
-    return date.getHours().toString().padStart(2,'0') + ':' + date.getMinutes().toString().padStart(2,'0');
+    // Fallback to simple extraction if conversion fails
+    const match = utcTimestamp.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    if (match) {
+      return `${match[1]}:${match[2]}:${match[3]}`;
+    }
+    return utcTimestamp;
   }
 }
 function updateTable(tags){
