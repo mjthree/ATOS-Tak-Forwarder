@@ -264,6 +264,11 @@ document.getElementById('minutes-submit').onclick = function() {
     fetchTagData(selected, minutesBack);
 };
 
+function cleanTimestamp(ts) {
+    // Remove microseconds if present (keep only 3 digits after decimal)
+    return ts ? ts.replace(/\.(\d{3})\d+/, '.$1') : ts;
+}
+
 function drawChart() {
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
@@ -318,8 +323,7 @@ function drawChart() {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            // context[0].label is the ISO string
-                            const d = new Date(context[0].label);
+                            const d = new Date(cleanTimestamp(context[0].label));
                             return d.toLocaleString();
                         }
                     }
@@ -332,8 +336,7 @@ function drawChart() {
                     title: { display: true, text: 'Time' },
                     ticks: {
                         callback: function(value, index, ticks) {
-                            // value is a timestamp (ms since epoch)
-                            const d = new Date(this.getLabelForValue(value));
+                            const d = new Date(cleanTimestamp(this.getLabelForValue(value)));
                             return d.toLocaleTimeString();
                         }
                     }
@@ -406,7 +409,7 @@ function setupSlider() {
     let allTimestamps = [];
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
-        allTimestamps = allTimestamps.concat(dataArr.map(d => new Date(d.timestamp).getTime()));
+        allTimestamps = allTimestamps.concat(dataArr.map(d => new Date(cleanTimestamp(d.timestamp)).getTime()));
     });
     if (allTimestamps.length < 2) return;
     allTimestamps.sort((a, b) => a - b);
@@ -420,8 +423,14 @@ function setupSlider() {
         range: { min: minTs, max: maxTs },
         step: 1000, // 1 second
         tooltips: [
-            { to: v => new Date(v).toLocaleString(), from: Number },
-            { to: v => new Date(v).toLocaleString(), from: Number }
+            { to: v => {
+                const d = new Date(Number(v));
+                return d.toLocaleString();
+            }, from: Number },
+            { to: v => {
+                const d = new Date(Number(v));
+                return d.toLocaleString();
+            }, from: Number }
         ],
         format: {
             to: v => Math.round(v),
@@ -445,7 +454,7 @@ function zoomChartToSlider() {
     selected.forEach(tagId => {
         const dataArr = tagData[tagId] || [];
         dataArr.forEach(d => {
-            const t = new Date(d.timestamp).getTime();
+            const t = new Date(cleanTimestamp(d.timestamp)).getTime();
             if (t >= startMs && t <= endMs) allLabels.add(d.timestamp);
         });
     });
@@ -491,8 +500,7 @@ function zoomChartToSlider() {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            // context[0].label is the ISO string
-                            const d = new Date(context[0].label);
+                            const d = new Date(cleanTimestamp(context[0].label));
                             return d.toLocaleString();
                         }
                     }
@@ -505,8 +513,7 @@ function zoomChartToSlider() {
                     title: { display: true, text: 'Time' },
                     ticks: {
                         callback: function(value, index, ticks) {
-                            // value is a timestamp (ms since epoch)
-                            const d = new Date(this.getLabelForValue(value));
+                            const d = new Date(cleanTimestamp(this.getLabelForValue(value)));
                             return d.toLocaleTimeString();
                         }
                     }
