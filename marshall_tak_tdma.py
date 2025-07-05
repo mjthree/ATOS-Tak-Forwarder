@@ -131,12 +131,13 @@ class PerformanceMonitor:
         try:
             process = psutil.Process()
             self.metrics['memory_usage_mb'] = round(process.memory_info().rss / 1024 / 1024, 2)
-            self.metrics['cpu_usage_percent'] = round(process.cpu_percent(), 2)
+            self.metrics['cpu_usage_percent'] = round(process.cpu_percent(interval=0.1), 2)
             self.metrics['system_cpu_percent'] = psutil.cpu_percent(interval=0.1)
         except ImportError:
             # Fallback if psutil not available
             self.metrics['memory_usage_mb'] = 0
             self.metrics['cpu_usage_percent'] = 0
+            self.metrics['system_cpu_percent'] = 0
         
         # Queue utilization
         queue_size = packet_queue.qsize()
@@ -754,6 +755,9 @@ def packet_processor():
                     tag_id = result['tag_id']
                     current_time = time.time()
                     
+                    # Always update last processed time for active tag tracking
+                    timing_system.mark_tag_processed(tag_id, current_time)
+                    
                     # Use unified timing system for rate limiting
                     if not timing_system.can_process_tag(tag_id, current_time):
                         # Skip this packet - too soon since last update for this tag
@@ -761,9 +765,6 @@ def packet_processor():
                         time_since_last = current_time - timing_system.tag_last_processed.get(tag_id, 0)
                         print(f"⏱️ Rate limiting tag {tag_id} - skipping packet (last update was {time_since_last:.2f}s ago)")
                         continue
-                    
-                    # Mark tag as processed
-                    timing_system.mark_tag_processed(tag_id, current_time)
                     
                     with TAG_DATA_LOCK:
                         old_data = tag_data.get(tag_id)
