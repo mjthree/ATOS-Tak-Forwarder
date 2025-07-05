@@ -149,13 +149,19 @@ class PerformanceMonitor:
             self.metrics['udp_send_rate'] = round(stats['udp_sends'] / time_diff, 2)
         
         # Error rate
-        total_operations = stats['total_packets'] + stats['rate_limited_packets']
+        total_errors = stats['rate_limited_packets'] + stats.get('udp_send_failures', 0)
+        total_operations = stats['total_packets'] + total_errors
         if total_operations > 0:
-            self.metrics['error_rate'] = round((stats['rate_limited_packets'] / total_operations) * 100, 2)
+            self.metrics['error_rate'] = round((total_errors / total_operations) * 100, 2)
+        else:
+            self.metrics['error_rate'] = 0
         
         # Connection status
-        self.metrics['active_connections'] = stats['active_tags']
         self.metrics['serial_connection_status'] = 'connected' if stats['connected'] else 'disconnected'
+        if 'tak_server_status' in self.metrics:
+            del self.metrics['tak_server_status']
+        if 'multicast_status' in self.metrics:
+            del self.metrics['multicast_status']
         
         # Database size
         try:
@@ -1090,6 +1096,7 @@ def api_performance():
         'total_packets': stats.get('total_packets', 0),
         'rate_limited_packets': stats.get('rate_limited_packets', 0),
         'udp_send_failures': stats.get('udp_send_failures', 0),
+        'other_errors': stats.get('other_errors', 0) if 'other_errors' in stats else 0,
     }
     return jsonify({
         'metrics': metrics,
