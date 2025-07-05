@@ -313,8 +313,11 @@ function setupSlider() {
     sliderReady = false;
     const sliderDiv = document.getElementById('slider');
     sliderDiv.innerHTML = '';
-    if (tagData.length < 2) return;
-    sliderTimestamps = tagData.map(d => new Date(d.timestamp).getTime());
+    const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
+    if (!selected.length) return;
+    const firstTagData = tagData[selected[0]] || [];
+    if (firstTagData.length < 2) return;
+    sliderTimestamps = firstTagData.map(d => new Date(d.timestamp).getTime());
     sliderRange = [0, sliderTimestamps.length - 1];
     sliderDiv.innerHTML = '<div id="slider-el"></div>';
     slider = document.getElementById('slider-el');
@@ -337,54 +340,61 @@ function setupSlider() {
 }
 
 function zoomChartToSlider() {
-    if (!slider || tagData.length < 2) return;
+    const selected = Array.from(document.getElementById('tag-select').selectedOptions).map(opt => opt.value);
+    if (!slider || !selected.length) return;
+    const firstTagData = tagData[selected[0]] || [];
+    if (firstTagData.length < 2) return;
     let [startIdx, endIdx] = slider.noUiSlider.get().map((_,i) => Math.round(slider.noUiSlider.get()[i]));
     // Clamp indices to valid range
-    startIdx = Math.max(0, Math.min(startIdx, tagData.length - 1));
-    endIdx = Math.max(0, Math.min(endIdx, tagData.length - 1));
+    startIdx = Math.max(0, Math.min(startIdx, firstTagData.length - 1));
+    endIdx = Math.max(0, Math.min(endIdx, firstTagData.length - 1));
     if (startIdx > endIdx) [startIdx, endIdx] = [endIdx, startIdx];
     // If slider is at full range, show all data
-    if (startIdx === 0 && endIdx === tagData.length - 1) {
+    if (startIdx === 0 && endIdx === firstTagData.length - 1) {
         drawChart();
         return;
     }
-    const zoomedData = tagData.slice(startIdx, endIdx + 1);
-    if (zoomedData.length === 0) return;
+    // For each selected tag, slice the data to the slider range
+    let datasets = [];
+    let allLabels = new Set();
+    selected.forEach((tagId, idx) => {
+        const color = TAG_COLORS[idx % TAG_COLORS.length].color;
+        const dataArr = tagData[tagId] || [];
+        const zoomedData = dataArr.slice(startIdx, endIdx + 1);
+        const labels = zoomedData.map(d => d.timestamp);
+        labels.forEach(l => allLabels.add(l));
+        const altitudes = zoomedData.map(d => Number(d.altitude_ft));
+        datasets.push({
+            label: `Tag ${tagId}`,
+            data: altitudes,
+            borderColor: color,
+            backgroundColor: color.replace('0.7','0.15'),
+            pointRadius: 1,
+            fill: true,
+            spanGaps: true,
+        });
+    });
+    const sortedLabels = Array.from(allLabels).sort();
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
-    const labels = zoomedData.map(d => d.timestamp);
-    const altitudes = zoomedData.map(d => Number(d.altitude_ft));
-    console.log('labels:', labels);
-    console.log('altitudes:', altitudes);
-    const xMin = tagData[startIdx]?.timestamp || tagData[0].timestamp;
-    const xMax = tagData[endIdx]?.timestamp || tagData[tagData.length-1].timestamp;
     chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
-            datasets: [{
-                label: 'Altitude (ft)',
-                data: altitudes,
-                borderColor: '#0074D9',
-                backgroundColor: 'rgba(0,116,217,0.1)',
-                pointRadius: 1,
-                fill: true
-            }]
+            labels: sortedLabels,
+            datasets: datasets
         },
         options: {
             responsive: true,
+            plugins: {
+                legend: { display: false },
+            },
             scales: {
-                x: {
-                    type: 'time',
-                    time: { unit: 'minute' },
-                    title: { display: true, text: 'Time' },
-                    min: xMin,
-                    max: xMax
-                },
+                x: { type: 'time', time: { unit: 'minute' }, title: { display: true, text: 'Time' } },
                 y: { title: { display: true, text: 'Altitude (ft)' } }
             }
         }
     });
+    updateLegend(selected);
 }
 
 function getSliderTimeRange() {
