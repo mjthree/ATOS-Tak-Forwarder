@@ -263,12 +263,14 @@ function drawChart() {
     if (!selected.length) return;
     let datasets = [];
     let allLabels = new Set();
+    let allAltitudes = [];
     selected.forEach((tagId, idx) => {
         const color = TAG_COLORS[idx % TAG_COLORS.length].color;
         const dataArr = tagData[tagId] || [];
         const labels = dataArr.map(d => d.timestamp);
         labels.forEach(l => allLabels.add(l));
         const altitudes = dataArr.map(d => Number(d.altitude_ft));
+        allAltitudes = allAltitudes.concat(altitudes);
         datasets.push({
             label: `Tag ${tagId}`,
             data: altitudes,
@@ -280,6 +282,11 @@ function drawChart() {
         });
     });
     const sortedLabels = Array.from(allLabels).sort();
+    // Dynamic Y-axis scaling
+    let yMin = Math.min(...allAltitudes);
+    let yMax = Math.max(...allAltitudes);
+    if (yMin === yMax) { yMin -= 10; yMax += 10; }
+    else { yMin = Math.floor(yMin - 0.05 * (yMax - yMin)); yMax = Math.ceil(yMax + 0.05 * (yMax - yMin)); }
     chart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -293,7 +300,7 @@ function drawChart() {
             },
             scales: {
                 x: { type: 'time', time: { unit: 'minute' }, title: { display: true, text: 'Time' } },
-                y: { title: { display: true, text: 'Altitude (ft)' } }
+                y: { title: { display: true, text: 'Altitude (ft)' }, min: yMin, max: yMax }
             }
         }
     });
@@ -359,6 +366,7 @@ function zoomChartToSlider() {
     // For each selected tag, slice the data to the slider range
     let datasets = [];
     let allLabels = new Set();
+    let allAltitudes = [];
     selected.forEach((tagId, idx) => {
         const color = TAG_COLORS[idx % TAG_COLORS.length].color;
         const dataArr = tagData[tagId] || [];
@@ -366,6 +374,7 @@ function zoomChartToSlider() {
         const labels = zoomedData.map(d => d.timestamp);
         labels.forEach(l => allLabels.add(l));
         const altitudes = zoomedData.map(d => Number(d.altitude_ft));
+        allAltitudes = allAltitudes.concat(altitudes);
         datasets.push({
             label: `Tag ${tagId}`,
             data: altitudes,
@@ -377,6 +386,11 @@ function zoomChartToSlider() {
         });
     });
     const sortedLabels = Array.from(allLabels).sort();
+    // Dynamic Y-axis scaling
+    let yMin = Math.min(...allAltitudes);
+    let yMax = Math.max(...allAltitudes);
+    if (yMin === yMax) { yMin -= 10; yMax += 10; }
+    else { yMin = Math.floor(yMin - 0.05 * (yMax - yMin)); yMax = Math.ceil(yMax + 0.05 * (yMax - yMin)); }
     const ctx = document.getElementById('altitude-chart').getContext('2d');
     if (chart) { chart.destroy(); chart = null; }
     chart = new Chart(ctx, {
@@ -392,7 +406,7 @@ function zoomChartToSlider() {
             },
             scales: {
                 x: { type: 'time', time: { unit: 'minute' }, title: { display: true, text: 'Time' } },
-                y: { title: { display: true, text: 'Altitude (ft)' } }
+                y: { title: { display: true, text: 'Altitude (ft)' }, min: yMin, max: yMax }
             }
         }
     });
