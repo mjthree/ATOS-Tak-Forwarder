@@ -993,7 +993,7 @@ def api_db_tag_data():
         params = [tag_id]
         if start is not None and start != '':
             q += ' AND timestamp >= ?'
-            params.append(int(start))
+            params.append(start)
         q += ' ORDER BY timestamp'
         with atos_sqlite.get_db() as conn:
             rows = conn.execute(q, params).fetchall()
@@ -1014,10 +1014,10 @@ def api_db_export_csv():
     params = [tag_id]
     if start:
         q += ' AND timestamp >= ?'
-        params.append(int(start))
+        params.append(start)
     if end:
         q += ' AND timestamp <= ?'
-        params.append(int(end))
+        params.append(end)
     q += ' ORDER BY timestamp'
     with atos_sqlite.get_db() as conn:
         rows = conn.execute(q, params).fetchall()
@@ -1119,10 +1119,10 @@ def api_db_export_kml():
             params = [tag_id]
             if start is not None and start != '':
                 q += ' AND timestamp >= ?'
-                params.append(int(start))
+                params.append(start)
             if end is not None and end != '':
                 q += ' AND timestamp <= ?'
-                params.append(int(end))
+                params.append(end)
             q += ' ORDER BY timestamp'
             rows = conn.execute(q, params).fetchall()
             # Build <when> and <gx:coord> lists
